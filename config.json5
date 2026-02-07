@@ -1,0 +1,49 @@
+// Server configuration for xcode-copilot-server.
+// Edit this file to add MCP servers, control tool access, and set permissions.
+//
+// Note: The Tool permissions are checked across all allowlists. If the same tool name
+// exists in both CLI and MCP tools, then they cannot have different permissions.
+
+{
+  // MCP servers to register with the Copilot CLI session.
+  // Each key is a server name, where the value follows the Copilot SDK MCPServerConfig shape.
+  // Relative paths in "args" are resolved relative to this file's directory.
+  mcpServers: {
+    xcode: {
+      type: "local",
+      command: "node",
+      args: ["./scripts/mcpbridge-proxy.mjs"],
+      allowedTools: ["*"],
+    },
+    // Example: add another MCP server
+    // myServer: {
+    //   type: "local",
+    //   command: "my-mcp-binary",
+    //   args: ["--some-flag"],
+    //   allowedTools: ["*"],
+    // },
+  },
+
+  // Built-in CLI tools allowlist (glob, grep, bash, etc)
+  // - ["*"]: allow all CLI tools
+  // - []: deny all CLI tools
+  // - ["glob", "grep"]: allow only specific CLI tools
+  allowedCliTools: [],
+
+  // Maximum request body size in MiB.
+  bodyLimitMiB: 4,
+
+  // Filename patterns to filter out from search results in the prompt.
+  // Code blocks whose filename contains any of these (case-insensitive) are stripped.
+  excludedFilePatterns: [],
+
+  // Reasoning effort for models that support it.
+  // E.g: "low", "medium", "high", "xhigh"
+  reasoningEffort: "xhigh",
+
+  // Auto-approve MCP permission requests.
+  // - true: approve all
+  // - false: deny all
+  // - ["read", "mcp"]: approve only listed kinds (e.g: "read", "write", "shell", "mcp", "url")
+  autoApprovePermissions: ["read", "mcp"],
+}

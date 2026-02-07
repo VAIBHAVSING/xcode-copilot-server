@@ -1,0 +1,48 @@
+{
+  "name": "xcode-copilot-server",
+  "version": "1.0.0",
+  "description": "OpenAI-compatible proxy API server for Xcode, powered by GitHub Copilot",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/theblixguy/xcode-copilot-server.git"
+  },
+"engines": {
+    "node": "25.6.0"
+  },
+  "bin": {
+    "xcode-copilot-server": "dist/index.js"
+  },
+  "files": [
+    "dist/",
+    "config.json5",
+    "scripts/"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@fastify/cors": "11.2.0",
+    "@github/copilot-sdk": "0.1.23",
+    "fastify": "5.7.4",
+    "json5": "2.2.3",
+    "zod": "4.3.6"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.2",
+    "@types/node": "25.2.1",
+    "eslint": "9.39.2",
+    "tsx": "4.21.0",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.54.0",
+    "vitest": "4.0.18"
+  }
+}

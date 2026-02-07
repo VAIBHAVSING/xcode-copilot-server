@@ -1,0 +1,118 @@
+#!/usr/bin/env node
+import { join, dirname } from "node:path";
+import { parseArgs } from "node:util";
+import { CopilotService } from "./copilot-service.js";
+import { loadConfig } from "./config.js";
+import { createServer } from "./server.js";
+import { Logger, LEVEL_PRIORITY, type LogLevel } from "./logger.js";
+import type { AppContext } from "./context.js";
+
+const PACKAGE_ROOT = dirname(import.meta.dirname);
+const DEFAULT_CONFIG_PATH = join(PACKAGE_ROOT, "config.json5");
+
+const VALID_LOG_LEVELS = Object.keys(LEVEL_PRIORITY) as LogLevel[];
+
+function isLogLevel(value: string): value is LogLevel {
+  return value in LEVEL_PRIORITY;
+}
+
+const USAGE = `Usage: xcode-copilot-server [options]
+
+Options:
+  --port <number>      Port to listen on (default: 8080)
+  --log-level <level>  Log verbosity: ${VALID_LOG_LEVELS.join(", ")} (default: info)
+  --config <path>      Path to config file (default: bundled config.json5)
+  --cwd <path>         Working directory for Copilot sessions (default: process cwd)
+  --help               Show this help message`;
+
+function parseCliArgs() {
+  try {
+    return parseArgs({
+      options: {
+        port: { type: "string", default: "8080" },
+        "log-level": { type: "string", default: "info" },
+        config: { type: "string", default: DEFAULT_CONFIG_PATH },
+        cwd: { type: "string" },
+        help: { type: "boolean", default: false },
+      },
+      strict: true,
+      allowPositionals: false,
+    });
+  } catch (err) {
+    console.error(String(err instanceof Error ? err.message : err));
+    console.error(`Run with --help for usage information.`);
+    process.exit(1);
+  }
+}
+
+async function main(): Promise<void> {
+  const { values } = parseCliArgs();
+
+  if (values.help) {
+    console.log(USAGE);
+    process.exit(0);
+  }
+
+  const port = parseInt(values.port, 10);
+  if (isNaN(port) || port < 1 || port > 65535) {
+    console.error(`Invalid port "${values.port}". Must be 1-65535.`);
+    process.exit(1);
+  }
+
+  const rawLevel = values["log-level"];
+  if (!isLogLevel(rawLevel)) {
+    console.error(
+      `Invalid log level "${rawLevel}". Valid: ${VALID_LOG_LEVELS.join(", ")}`,
+    );
+    process.exit(1);
+  }
+  const logLevel = rawLevel;
+  const logger = new Logger(logLevel);
+
+  const config = await loadConfig(values.config, logger);
+  const cwd = values.cwd;
+
+  const service = new CopilotService({
+    logLevel,
+    logger,
+    cwd,
+  });
+
+  logger.info("Booting up Copilot CLI...");
+  await service.start();
+  logger.info("Copilot CLI is up");
+
+  const ctx: AppContext = { service, logger, config };
+  const app = await createServer(ctx);
+  await app.listen({ port, host: "127.0.0.1" });
+
+  logger.info(`Listening on http://localhost:${String(port)}`);
+  logger.info("Routes: GET /v1/models, POST /v1/chat/completions");
+  logger.info(`Current working directory: ${service.cwd}`);
+
+  const shutdown = async (signal: string) => {
+    logger.info(`Got ${signal}, shutting down...`);
+    await app.close();
+
+    const stopPromise = service.stop().then(() => {
+      logger.info("Clean shutdown complete");
+    });
+    const timeoutPromise = new Promise<void>((resolve) =>
+      setTimeout(() => {
+        logger.warn("Copilot client didn't stop in time, forcing exit");
+        resolve();
+      }, 3000),
+    );
+
+    await Promise.race([stopPromise, timeoutPromise]);
+    process.exit(0);
+  };
+
+  process.on("SIGINT", () => void shutdown("SIGINT"));
+  process.on("SIGTERM", () => void shutdown("SIGTERM"));
+}
+
+main().catch((err: unknown) => {
+  console.error("Fatal error:", err);
+  process.exit(1);
+});
