@@ -6,19 +6,21 @@ An OpenAI-compatible proxy API server that lets you use GitHub Copilot in Xcode.
 
 Xcode 26 added support for third-party LLM providers, but it only supports ChatGPT and Claude out of the box. If you have a GitHub Copilot subscription and want to use it in Xcode, that's not possible as there's no built-in option for it.
 
-However, Xcode does let you add a custom model provider, as long as it exposes an OpenAI-compatible API. GitHub Copilot doesn't do that, but this server helps bridges the gap by wrapping the [GitHub Copilot SDK](https://www.npmjs.com/package/@github/copilot-sdk) and exposing it as an OpenAI-compatible API that Xcode can talk to.
+However, Xcode does let you add a custom model provider, as long as it exposes an OpenAI-compatible API. GitHub Copilot doesn't do that, but this server helps bridges the gap by wrapping the [GitHub Copilot SDK](https://github.com/github/copilot-sdk) and exposing it as an OpenAI-compatible API that Xcode can talk to.
 
 It also connects to Xcode's built-in MCP tools (via `xcrun mcpbridge`), giving Copilot access to your project's build logs, indexes and other context that Xcode provides. This requires Xcode 26.3 or later.
 
 ## Installation
 
-You need [Node.js](https://nodejs.org) 25.6.0 or later.
+You need [Node.js](https://nodejs.org) 25.6.0 or later and the GitHub Copilot CLI. [Install the Copilot CLI](https://docs.github.com/en/copilot/how-tos/copilot-cli/install-copilot-cli) and sign in before starting the server.
+
+Once done, you can install this server via:
 
 ```bash
 npm install -g xcode-copilot-server
 ```
 
-Or run it directly:
+Or run it without installing globally:
 
 ```bash
 npx xcode-copilot-server
@@ -41,8 +43,6 @@ The server listens on `http://localhost:8080` by default and exposes two routes:
 
 - `GET /v1/models` — lists available models from your Copilot subscription
 - `POST /v1/chat/completions` — handles chat completion requests (streaming)
-
-You will need to be signed in to GitHub Copilot through the [Copilot CLI](https://docs.github.com/en/copilot/using-github-copilot/using-github-copilot-in-the-command-line).
 
 ## Xcode integration
 
