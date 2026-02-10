@@ -1,5 +1,5 @@
 import type { Provider } from "./types.js";
-import { registerPassthrough } from "../passthrough/index.js";
+import { registerToolBridge } from "../tool-bridge/index.js";
 import { createMessagesHandler } from "../handlers/messages.js";
 import { createCountTokensHandler } from "../handlers/messages/count-tokens.js";
 
@@ -9,7 +9,7 @@ export const anthropicProvider = {
 
   register(app, ctx) {
     app.addHook("onRequest", (request, reply, done) => {
-      // Internal routes are called by the MCP passthrough script (no UA)
+      // Internal routes are called by the MCP tool bridge script (no UA)
       if (request.url.startsWith("/internal/")) {
         done();
         return;
@@ -23,7 +23,7 @@ export const anthropicProvider = {
       done();
     });
 
-    const state = registerPassthrough(app, ctx.logger);
+    const state = registerToolBridge(app, ctx.logger);
     app.post("/v1/messages", createMessagesHandler(ctx, state));
     app.post("/v1/messages/count_tokens", createCountTokensHandler(ctx));
   },

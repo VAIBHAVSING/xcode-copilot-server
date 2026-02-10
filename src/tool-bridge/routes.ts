@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { z } from "zod";
-import type { PassthroughState } from "./state.js";
+import type { ToolBridgeState } from "./state.js";
 import type { Logger } from "../logger.js";
 
 const ToolCallBodySchema = z.object({
@@ -10,7 +10,7 @@ const ToolCallBodySchema = z.object({
 
 export function registerRoutes(
   app: FastifyInstance,
-  state: PassthroughState,
+  state: ToolBridgeState,
   logger: Logger,
 ): void {
   app.get("/internal/tools", (_request: FastifyRequest, reply: FastifyReply) => {

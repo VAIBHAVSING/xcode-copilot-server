@@ -16,7 +16,7 @@ const PORT = process.env.MCP_SERVER_PORT ?? "8080";
 const BASE = `http://127.0.0.1:${PORT}`;
 
 function log(msg) {
-  process.stderr.write(`[mcp-passthrough] ${msg}\n`);
+  process.stderr.write(`[mcp-tool-bridge] ${msg}\n`);
 }
 
 log(`Starting, port=${PORT}`);
@@ -38,7 +38,7 @@ async function handleInitialize(id) {
   respond(id, {
     protocolVersion: "2024-11-05",
     capabilities: { tools: {} },
-    serverInfo: { name: "xcode-passthrough", version: "1.0.0" },
+    serverInfo: { name: "xcode-bridge", version: "1.0.0" },
   });
 }
 

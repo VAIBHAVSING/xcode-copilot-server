@@ -8,7 +8,7 @@ import {
 import { formatAnthropicPrompt } from "../utils/anthropic-prompt.js";
 import { resolveModel } from "../utils/model-resolver.js";
 import { createSessionConfig } from "./session-config.js";
-import type { PassthroughState } from "../passthrough/state.js";
+import type { ToolBridgeState } from "../tool-bridge/state.js";
 import { resolveToolResults } from "./messages/tool-result-handler.js";
 import { handleAnthropicStreaming, startReply } from "./messages/streaming.js";
 
@@ -26,7 +26,7 @@ function sendError(
 
 export function createMessagesHandler(
   { service, logger, config, port }: AppContext,
-  state: PassthroughState,
+  state: ToolBridgeState,
 ) {
   let sentMessageCount = 0;
 
@@ -131,10 +131,10 @@ export function createMessagesHandler(
       logger.warn("Failed to list models, passing model through as-is:", err);
     }
 
-    const mcpPassthroughServer = hasTools ? config.passthroughMcpServer : undefined;
+    const toolBridgeServer = hasTools ? config.toolBridge : undefined;
 
-    if (mcpPassthroughServer) {
-      logger.info(`MCP passthrough server: ${mcpPassthroughServer.command} ${mcpPassthroughServer.args.join(" ")}`);
+    if (toolBridgeServer) {
+      logger.info(`Tool bridge server: ${toolBridgeServer.command} ${toolBridgeServer.args.join(" ")}`);
     }
 
     const sessionConfig = createSessionConfig({
@@ -144,7 +144,7 @@ export function createMessagesHandler(
       config,
       supportsReasoningEffort,
       cwd: service.cwd,
-      mcpPassthroughServer,
+      toolBridgeServer,
       port,
     });
 

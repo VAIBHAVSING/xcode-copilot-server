@@ -26,7 +26,7 @@ function writeConfig(filename: string, content: string): string {
 describe("loadConfig", () => {
   it("returns defaults when config file does not exist", async () => {
     const config = await loadConfig("/nonexistent/config.json5", logger);
-    expect(config.passthroughMcpServer).toBeNull();
+    expect(config.toolBridge).toBeNull();
     expect(config.mcpServers).toEqual({});
     expect(config.allowedCliTools).toEqual([]);
     expect(config.excludedFilePatterns).toEqual([]);
@@ -131,36 +131,36 @@ describe("loadConfig", () => {
     expect(config.bodyLimit).toBe(10 * 1024 * 1024);
   });
 
-  it("loads passthroughMcpServer with relative path resolution", async () => {
+  it("loads toolBridge with relative path resolution", async () => {
     const path = writeConfig(
-      "passthrough.json5",
+      "bridge.json5",
       `{
-        passthroughMcpServer: {
+        toolBridge: {
           command: "node",
-          args: ["./scripts/mcp-passthrough.mjs"],
+          args: ["./scripts/mcp-tool-bridge.mjs"],
         },
       }`,
     );
     const config = await loadConfig(path, logger);
-    expect(config.passthroughMcpServer).toEqual({
+    expect(config.toolBridge).toEqual({
       command: "node",
-      args: [join(tempDir, "scripts/mcp-passthrough.mjs")],
+      args: [join(tempDir, "scripts/mcp-tool-bridge.mjs")],
     });
   });
 
-  it("defaults passthroughMcpServer to null when absent", async () => {
+  it("defaults toolBridge to null when absent", async () => {
     const path = writeConfig("minimal.json5", `{}`);
     const config = await loadConfig(path, logger);
-    expect(config.passthroughMcpServer).toBeNull();
+    expect(config.toolBridge).toBeNull();
   });
 
-  it("allows explicit null for passthroughMcpServer", async () => {
+  it("allows explicit null for toolBridge", async () => {
     const path = writeConfig(
-      "null-passthrough.json5",
-      `{ passthroughMcpServer: null }`,
+      "null-bridge.json5",
+      `{ toolBridge: null }`,
     );
     const config = await loadConfig(path, logger);
-    expect(config.passthroughMcpServer).toBeNull();
+    expect(config.toolBridge).toBeNull();
   });
 });
 
@@ -227,10 +227,10 @@ describe("config validation", () => {
     await expect(loadConfig(path, logger)).rejects.toThrow(/url/i);
   });
 
-  it("rejects invalid passthroughMcpServer (missing command)", async () => {
+  it("rejects invalid toolBridge (missing command)", async () => {
     const path = writeConfig(
       "bad.json5",
-      `{ passthroughMcpServer: { args: [] } }`,
+      `{ toolBridge: { args: [] } }`,
     );
     await expect(loadConfig(path, logger)).rejects.toThrow(/Invalid/i);
   });
@@ -238,7 +238,7 @@ describe("config validation", () => {
   it("uses defaults for missing optional fields", async () => {
     const path = writeConfig("minimal.json5", `{}`);
     const config = await loadConfig(path, logger);
-    expect(config.passthroughMcpServer).toBeNull();
+    expect(config.toolBridge).toBeNull();
     expect(config.mcpServers).toEqual({});
     expect(config.allowedCliTools).toEqual([]);
     expect(config.bodyLimit).toBe(4 * 1024 * 1024);

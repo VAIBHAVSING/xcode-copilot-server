@@ -9,7 +9,7 @@ import type { FastifyInstance } from "fastify";
 const logger = new Logger("none");
 
 const config: ServerConfig = {
-  passthroughMcpServer: null,
+  toolBridge: null,
   mcpServers: {},
   allowedCliTools: [],
   excludedFilePatterns: [],

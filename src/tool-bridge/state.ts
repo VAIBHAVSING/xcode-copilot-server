@@ -10,7 +10,7 @@ interface PendingMCPRequest {
   timeout: ReturnType<typeof setTimeout>;
 }
 
-export class PassthroughState {
+export class ToolBridgeState {
   private cachedTools: AnthropicToolDefinition[] = [];
 
   // Queues tool call IDs by name so we can match them to incoming MCP HTTP

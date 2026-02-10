@@ -5,7 +5,7 @@ import type { ServerConfig, MCPLocalServer } from "../../src/config.js";
 import type { PermissionRequest } from "@github/copilot-sdk";
 
 const baseConfig: ServerConfig = {
-  passthroughMcpServer: null,
+  toolBridge: null,
   mcpServers: {},
   allowedCliTools: [],
   excludedFilePatterns: [],
@@ -280,31 +280,31 @@ describe("tool filtering", () => {
     expect(config.availableTools).toBeUndefined();
   });
 
-  it("allows xcode-passthrough-* tools when passthrough is active", async () => {
+  it("allows xcode-bridge-* tools when bridge is active", async () => {
     const config = createSessionConfig({
       model: "gpt-4",
       logger,
       config: makeConfig(),
       supportsReasoningEffort: false,
-      mcpPassthroughServer: { command: "node", args: ["/path/to/mcp-passthrough.mjs"] },
+      toolBridgeServer: { command: "node", args: ["/path/to/mcp-tool-bridge.mjs"] },
       port: 8080,
     });
-    const result = await config.hooks!.onPreToolUse!(toolUseInput("xcode-passthrough-Read"), invocation);
+    const result = await config.hooks!.onPreToolUse!(toolUseInput("xcode-bridge-Read"), invocation);
     expect(result).toEqual({ permissionDecision: "allow" });
   });
 
-  it("allows CLI tools alongside passthrough when allowedCliTools is set", async () => {
+  it("allows CLI tools alongside bridge when allowedCliTools is set", async () => {
     const config = createSessionConfig({
       model: "gpt-4",
       logger,
       config: makeConfig({ allowedCliTools: ["glob", "grep"] }),
       supportsReasoningEffort: false,
-      mcpPassthroughServer: { command: "node", args: ["/path/to/mcp-passthrough.mjs"] },
+      toolBridgeServer: { command: "node", args: ["/path/to/mcp-tool-bridge.mjs"] },
       port: 8080,
     });
-    // Passthrough tools allowed
-    const passthrough = await config.hooks!.onPreToolUse!(toolUseInput("xcode-passthrough-Read"), invocation);
-    expect(passthrough).toEqual({ permissionDecision: "allow" });
+    // Bridge tools allowed
+    const bridge = await config.hooks!.onPreToolUse!(toolUseInput("xcode-bridge-Read"), invocation);
+    expect(bridge).toEqual({ permissionDecision: "allow" });
     // CLI tools also allowed (additive)
     const cli = await config.hooks!.onPreToolUse!(toolUseInput("glob"), invocation);
     expect(cli).toEqual({ permissionDecision: "allow" });
@@ -313,23 +313,23 @@ describe("tool filtering", () => {
     expect(denied).toEqual({ permissionDecision: "deny" });
   });
 
-  it("does not activate passthrough when mcpPassthroughServer is null", async () => {
+  it("does not activate bridge when toolBridgeServer is null", async () => {
     const config = createSessionConfig({
       model: "gpt-4",
       logger,
       config: makeConfig({ allowedCliTools: [] }),
       supportsReasoningEffort: false,
-      mcpPassthroughServer: null,
+      toolBridgeServer: null,
       port: 8080,
     });
-    // No passthrough server, so xcode-passthrough-* tools are denied
-    const result = await config.hooks!.onPreToolUse!(toolUseInput("xcode-passthrough-Read"), invocation);
+    // No bridge server, so xcode-bridge-* tools are denied
+    const result = await config.hooks!.onPreToolUse!(toolUseInput("xcode-bridge-Read"), invocation);
     expect(result).toEqual({ permissionDecision: "deny" });
-    // No xcode-passthrough MCP server entry
+    // No xcode-bridge MCP server entry
     expect(config.mcpServers).toEqual({});
   });
 
-  it("does not activate passthrough when mcpPassthroughServer is undefined", async () => {
+  it("does not activate bridge when toolBridgeServer is undefined", async () => {
     const config = createSessionConfig({
       model: "gpt-4",
       logger,
@@ -337,7 +337,7 @@ describe("tool filtering", () => {
       supportsReasoningEffort: false,
       port: 8080,
     });
-    const result = await config.hooks!.onPreToolUse!(toolUseInput("xcode-passthrough-Read"), invocation);
+    const result = await config.hooks!.onPreToolUse!(toolUseInput("xcode-bridge-Read"), invocation);
     expect(result).toEqual({ permissionDecision: "deny" });
     expect(config.mcpServers).toEqual({});
   });

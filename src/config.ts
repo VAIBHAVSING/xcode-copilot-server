@@ -6,7 +6,7 @@ import type { Logger } from "./logger.js";
 import {
   ServerConfigSchema,
   type MCPServer,
-  type PassthroughMCPServer,
+  type ToolBridgeServer,
   type RawServerConfig,
 } from "./schemas/config.js";
 
@@ -16,7 +16,7 @@ export type {
   MCPServer,
   ApprovalRule,
   ReasoningEffort,
-  PassthroughMCPServer,
+  ToolBridgeServer,
 } from "./schemas/config.js";
 
 export type ServerConfig = Omit<RawServerConfig, "bodyLimitMiB"> & {
@@ -24,7 +24,7 @@ export type ServerConfig = Omit<RawServerConfig, "bodyLimitMiB"> & {
 };
 
 const DEFAULT_CONFIG = {
-  passthroughMcpServer: null,
+  toolBridge: null,
   mcpServers: {},
   allowedCliTools: [],
   excludedFilePatterns: [],
@@ -53,10 +53,10 @@ function resolveServerPaths(
   );
 }
 
-function resolvePassthroughPaths(
-  server: PassthroughMCPServer | undefined,
+function resolveBridgePaths(
+  server: ToolBridgeServer | undefined,
   configDir: string,
-): PassthroughMCPServer {
+): ToolBridgeServer {
   if (!server) return null;
   return {
     ...server,
@@ -114,8 +114,8 @@ export async function loadConfig(
   const config: ServerConfig = {
     ...rest,
     bodyLimit: bodyLimitMiB * 1024 * 1024,
-    passthroughMcpServer: resolvePassthroughPaths(
-      parseResult.data.passthroughMcpServer,
+    toolBridge: resolveBridgePaths(
+      parseResult.data.toolBridge,
       configDir,
     ),
     mcpServers: resolveServerPaths(

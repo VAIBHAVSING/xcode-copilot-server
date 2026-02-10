@@ -1,10 +1,10 @@
 import type { AnthropicMessage } from "../../schemas/anthropic.js";
-import type { PassthroughState } from "../../passthrough/state.js";
+import type { ToolBridgeState } from "../../tool-bridge/state.js";
 import type { Logger } from "../../logger.js";
 
 export function resolveToolResults(
   messages: AnthropicMessage[],
-  state: PassthroughState,
+  state: ToolBridgeState,
   logger: Logger,
 ): void {
   const lastMsg = messages[messages.length - 1];

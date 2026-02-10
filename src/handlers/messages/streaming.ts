@@ -9,11 +9,11 @@ import type {
   MessageDeltaEvent,
   MessageStopEvent,
 } from "../../schemas/anthropic.js";
-import type { PassthroughState } from "../../passthrough/state.js";
+import type { ToolBridgeState } from "../../tool-bridge/state.js";
 
-const MCP_PREFIX = "xcode-passthrough-";
+const MCP_PREFIX = "xcode-bridge-";
 
-// The CLI prefixes MCP tool names with "xcode-passthrough-" so we strip that
+// The CLI prefixes MCP tool names with "xcode-bridge-" so we strip that
 // before sending to Xcode, otherwise tool names won't match what Xcode expects.
 function stripMCPPrefix(name: string): string {
   return name.startsWith(MCP_PREFIX) ? name.slice(MCP_PREFIX.length) : name;
@@ -51,15 +51,15 @@ export function startReply(reply: FastifyReply, model: string): void {
 }
 
 export async function handleAnthropicStreaming(
-  state: PassthroughState,
+  state: ToolBridgeState,
   session: CopilotSession,
   prompt: string,
   model: string,
   logger: Logger,
-  hasPassthrough = false,
+  hasBridge = false,
 ): Promise<void> {
   const reply = state.currentReply;
-  if (!reply) throw new Error("No reply set on passthrough state");
+  if (!reply) throw new Error("No reply set on bridge state");
   startReply(reply, model);
   state.markSessionActive();
 
@@ -196,20 +196,20 @@ export async function handleAnthropicStreaming(
         logger.debug(`assistant.message: toolRequests=${String(event.data.toolRequests?.length ?? 0)}, content=${JSON.stringify(event.data)}`);
 
         if (event.data.toolRequests && event.data.toolRequests.length > 0) {
-          // Only forward tools that came through the MCP shim when passthrough
-          // is active, since non-passthrough tools (e.g. report_intent) are
-          // denied by the onPreToolUse hook and handled internally by the CLI.
-          const passthroughRequests = hasPassthrough
+          // Only forward tools that came through the MCP shim when the bridge
+          // is active, since non-bridge tools (e.g. report_intent) are denied
+          // by the onPreToolUse hook and handled internally by the CLI.
+          const bridgeRequests = hasBridge
             ? event.data.toolRequests.filter((tr) => tr.name.startsWith(MCP_PREFIX))
             : event.data.toolRequests;
 
-          if (hasPassthrough && passthroughRequests.length < event.data.toolRequests.length) {
-            const skipped = event.data.toolRequests.length - passthroughRequests.length;
-            logger.debug(`Skipped ${String(skipped)} non-passthrough tool request(s) (handled internally by CLI)`);
+          if (hasBridge && bridgeRequests.length < event.data.toolRequests.length) {
+            const skipped = event.data.toolRequests.length - bridgeRequests.length;
+            logger.debug(`Skipped ${String(skipped)} non-bridge tool request(s) (handled internally by CLI)`);
           }
 
           // Strip MCP prefix so names match what the MCP shim sends and what Xcode expects
-          const stripped = passthroughRequests.map((tr) => ({
+          const stripped = bridgeRequests.map((tr) => ({
             ...tr,
             name: stripMCPPrefix(tr.name),
           }));
@@ -238,10 +238,10 @@ export async function handleAnthropicStreaming(
               logger.debug("assistant.message with tool requests but no reply (internal retry), registered expected tools");
             }
           } else {
-            // All tool requests were non-passthrough (denied by hook), so
-            // don't emit any tool_use blocks. The CLI handles the denials
-            // internally and the model will continue with another response.
-            logger.debug("All tool requests were non-passthrough, no tool_use blocks emitted");
+            // All tool requests were non-bridge (denied by hook), so don't
+            // emit any tool_use blocks. The CLI handles the denials internally
+            // and the model will continue with another response.
+            logger.debug("All tool requests were non-bridge, no tool_use blocks emitted");
           }
         } else {
           const r = getReply();

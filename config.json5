@@ -9,10 +9,10 @@
   // of letting Claude execute its own tools through Xcode. This shim bridges
   // tool definitions and results between the SDK session and the client over
   // HTTP. MCP_SERVER_PORT is injected automatically at runtime.
-  // Set to null or remove to disable passthrough.
-  passthroughMcpServer: {
+  // Set to null or remove to disable the tool bridge.
+  toolBridge: {
     command: "node",
-    args: ["./scripts/mcp-passthrough.mjs"],
+    args: ["./scripts/mcp-tool-bridge.mjs"],
   },
 
   // MCP servers to register with the Copilot CLI session. Each key is a server
@@ -42,8 +42,8 @@
   // Xcode what to change and Xcode applies those changes through its own UI,
   // keeping everything in sync. If CLI tools are enabled, the Copilot session
   // may perform those operations itself (e.g. writing files via bash),
-  // bypassing Xcode and leaving its UI out of sync with what actually happened
-  // on disk.
+  // bypassing Xcode and potentiall leaving its UI out of sync with what actually 
+  // happened on disk.
   allowedCliTools: ["*"],
 
   // Maximum request body size in MiB.
