@@ -6,7 +6,10 @@
     "outDir": "dist",
     "rootDir": "src",
     "strict": true,
+    "verbatimModuleSyntax": true,
+    "erasableSyntaxOnly": true,
     "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
 

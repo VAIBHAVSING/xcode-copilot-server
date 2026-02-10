@@ -1,4 +1,4 @@
-import type { SessionConfig } from "@github/copilot-sdk";
+import type { SessionConfig, MCPServerConfig } from "@github/copilot-sdk";
 import type { ServerConfig, ApprovalRule } from "../../config.js";
 import type { Logger } from "../../logger.js";
 
@@ -40,7 +40,7 @@ export function createSessionConfig({
     mcpServers: Object.fromEntries(
       Object.entries(config.mcpServers).map(([name, server]) => [
         name,
-        { ...server, tools: ["*"] },
+        { ...server, tools: ["*"] } as MCPServerConfig,
       ]),
     ),
 

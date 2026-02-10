@@ -1,7 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { createSessionConfig } from "../../../src/handlers/completions/session-config.js";
 import { Logger } from "../../../src/logger.js";
-import type { ServerConfig } from "../../../src/config.js";
+import type { ServerConfig, MCPLocalServer } from "../../../src/config.js";
+
+function mcpStdio(overrides: Partial<MCPLocalServer> = {}): MCPLocalServer {
+  return { type: "stdio", command: "node", args: [], ...overrides };
+}
 
 const baseConfig: ServerConfig = {
   mcpServers: {},
@@ -56,7 +60,7 @@ describe("createSessionConfig", () => {
 
   it("transforms mcpServers to always use tools: ['*']", () => {
     const mcpServers = {
-      test: { command: "node", args: ["server.js"], allowedTools: ["tool1"] },
+      test: mcpStdio({ args: ["server.js"], allowedTools: ["tool1"] }),
     };
     const config = createSessionConfig({
       model: "gpt-4",
@@ -65,7 +69,7 @@ describe("createSessionConfig", () => {
       supportsReasoningEffort: false,
     });
     expect(config.mcpServers).toEqual({
-      test: { command: "node", args: ["server.js"], allowedTools: ["tool1"], tools: ["*"] },
+      test: { type: "stdio", command: "node", args: ["server.js"], allowedTools: ["tool1"], tools: ["*"] },
     });
   });
 });
@@ -148,7 +152,7 @@ describe("tool filtering", () => {
       config: makeConfig({
         allowedCliTools: [],
         mcpServers: {
-          xcode: { command: "node", args: [], allowedTools: ["XcodeBuild"] },
+          xcode: mcpStdio({ allowedTools: ["XcodeBuild"] }),
         },
       }),
       supportsReasoningEffort: false,
@@ -177,7 +181,7 @@ describe("tool filtering", () => {
       config: makeConfig({
         allowedCliTools: [],
         mcpServers: {
-          xcode: { command: "node", args: [], allowedTools: ["*"] },
+          xcode: mcpStdio({ allowedTools: ["*"] }),
         },
       }),
       supportsReasoningEffort: false,
@@ -193,8 +197,8 @@ describe("tool filtering", () => {
       config: makeConfig({
         allowedCliTools: ["glob"],
         mcpServers: {
-          xcode: { command: "node", args: [], allowedTools: ["XcodeBuild"] },
-          other: { command: "node", args: [], allowedTools: ["CustomTool"] },
+          xcode: mcpStdio({ allowedTools: ["XcodeBuild"] }),
+          other: mcpStdio({ allowedTools: ["CustomTool"] }),
         },
       }),
       supportsReasoningEffort: false,
