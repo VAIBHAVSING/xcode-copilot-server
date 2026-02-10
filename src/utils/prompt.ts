@@ -63,6 +63,11 @@ export function formatPrompt(
       case "tool":
         parts.push(`[Tool result for ${msg.tool_call_id ?? "unknown"}]: ${content}`);
         break;
+
+      case undefined:
+        break;
+      default:
+        throw msg.role satisfies never;
     }
   }
 
