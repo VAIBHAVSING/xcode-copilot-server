@@ -14,6 +14,11 @@ export default defineConfig(
     },
   },
   {
+    rules: {
+      "@typescript-eslint/only-throw-error": ["error", { allow: [{ from: "lib", name: "never" }] }],
+    },
+  },
+  {
     ignores: ["dist/", "node_modules/", "scripts/", "test/", "config.json5", "eslint.config.js", "vitest.config.ts"],
   },
 );
