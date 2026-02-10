@@ -20,7 +20,7 @@ export async function createServer(
   const app = Fastify({
     bodyLimit: ctx.config.bodyLimit,
     // Destroy active connections immediately on close() so shutdown doesn't
-    // hang waiting for SSE streams or pending requests to drain.
+    // hang waiting for SSE streams or pending tool bridge requests to drain.
     forceCloseConnections: true,
     logger: {
       level: PINO_LEVEL[ctx.logger.level],
