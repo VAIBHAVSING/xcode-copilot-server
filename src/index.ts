@@ -63,7 +63,7 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const proxy = values.proxy;
+  const proxy = values.proxy as "openai" | "anthropic";
   const provider = providers[proxy];
   if (!provider) {
     console.error(
@@ -82,7 +82,7 @@ async function main(): Promise<void> {
   const logLevel = rawLevel;
   const logger = new Logger(logLevel);
 
-  const config = await loadConfig(values.config, logger);
+  const config = await loadConfig(values.config, logger, proxy);
   const cwd = values.cwd;
 
   const service = new CopilotService({

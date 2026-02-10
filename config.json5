@@ -5,33 +5,39 @@
 // exists in both CLI and MCP tools then they can't have different permissions.
 
 {
-  // Without this, the Copilot SDK would consume tool_use calls itself instead
-  // of letting Claude execute its own tools through Xcode. This shim bridges
-  // tool definitions and results between the SDK session and the client over
-  // HTTP. MCP_SERVER_PORT is injected automatically at runtime.
-  // Set to null or remove to disable the tool bridge.
-  toolBridge: {
-    command: "node",
-    args: ["./scripts/mcp-tool-bridge.mjs"],
+  // Provider-specific settings. The active --proxy flag determines which
+  // section is used at runtime.
+
+  openai: {
+    // No tool bridge needed for OpenAI, because Xcode drives tool execution 
+    // directly.
+    toolBridge: null,
+
+    mcpServers: {
+      // Proxies Apple's xcrun mcpbridge (Xcode 26.3+). The script exits
+      // gracefully if mcpbridge isn't installed, so safe to leave enabled.
+      xcode: {
+        type: "local",
+        command: "node",
+        args: ["./scripts/mcpbridge-proxy.mjs"],
+        allowedTools: ["*"],
+      },
+    },
   },
 
-  // MCP servers to register with the Copilot CLI session. Each key is a server
-  // name and the value follows the Copilot SDK MCPServerConfig shape. Relative
-  // paths in "args" are resolved relative to this file's directory.
-  mcpServers: {
-    // xcode: {
-    //   type: "local",
-    //   command: "node",
-    //   args: ["./scripts/mcpbridge-proxy.mjs"],
-    //   allowedTools: ["*"],
-    // },
-    // Example: add another MCP server
-    // myServer: {
-    //   type: "local",
-    //   command: "my-mcp-binary",
-    //   args: ["--some-flag"],
-    //   allowedTools: ["*"],
-    // },
+  anthropic: {
+    // Normally the Copilot SDK executes tool calls (file reads, edits, etc.)
+    // on its own. This shim intercepts those calls and forwards them to Xcode
+    // so Claude Agent can drive tool execution through the IDE instead.
+    // MCP_SERVER_PORT is injected automatically at runtime.
+    // Set to null or remove to disable the tool bridge.
+    toolBridge: {
+      command: "node",
+      args: ["./scripts/mcp-tool-bridge.mjs"],
+    },
+
+    // No MCP servers needed, because Claude Agent handles tools natively.
+    mcpServers: {},
   },
 
   // Built-in CLI tools allowlist (glob, grep, bash, etc). Use ["*"] to allow
@@ -42,9 +48,9 @@
   // Xcode what to change and Xcode applies those changes through its own UI,
   // keeping everything in sync. If CLI tools are enabled, the Copilot session
   // may perform those operations itself (e.g. writing files via bash),
-  // bypassing Xcode and potentiall leaving its UI out of sync with what actually 
+  // bypassing Xcode and potentiall leaving its UI out of sync with what actually
   // happened on disk.
-  allowedCliTools: ["*"],
+  allowedCliTools: [],
 
   // Maximum request body size in MiB.
   bodyLimitMiB: 4,

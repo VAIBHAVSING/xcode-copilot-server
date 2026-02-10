@@ -25,7 +25,7 @@ function writeConfig(filename: string, content: string): string {
 
 describe("loadConfig", () => {
   it("returns defaults when config file does not exist", async () => {
-    const config = await loadConfig("/nonexistent/config.json5", logger);
+    const config = await loadConfig("/nonexistent/config.json5", logger, "openai");
     expect(config.toolBridge).toBeNull();
     expect(config.mcpServers).toEqual({});
     expect(config.allowedCliTools).toEqual([]);
@@ -40,7 +40,7 @@ describe("loadConfig", () => {
       "config.json5",
       `{ allowedCliTools: ["search"], bodyLimitMiB: 1 }`,
     );
-    const config = await loadConfig(path, logger);
+    const config = await loadConfig(path, logger, "openai");
     expect(config.allowedCliTools).toEqual(["search"]);
     expect(config.bodyLimit).toBe(1 * 1024 * 1024);
     expect(config.mcpServers).toEqual({});
@@ -49,14 +49,14 @@ describe("loadConfig", () => {
 
   it("throws on invalid config (non-object)", async () => {
     const path = writeConfig("bad.json5", `"not an object"`);
-    await expect(loadConfig(path, logger)).rejects.toThrow(
+    await expect(loadConfig(path, logger, "openai")).rejects.toThrow(
       "Config file must contain a JSON5 object",
     );
   });
 
   it("throws on invalid JSON5 syntax", async () => {
     const path = writeConfig("bad.json5", `{ broken:`);
-    await expect(loadConfig(path, logger)).rejects.toThrow(
+    await expect(loadConfig(path, logger, "openai")).rejects.toThrow(
       /Failed to parse config file/,
     );
   });
@@ -66,7 +66,7 @@ describe("loadConfig", () => {
       "perms.json5",
       `{ autoApprovePermissions: ["read", "write"] }`,
     );
-    const config = await loadConfig(path, logger);
+    const config = await loadConfig(path, logger, "openai");
     expect(config.autoApprovePermissions).toEqual(["read", "write"]);
   });
 
@@ -74,16 +74,18 @@ describe("loadConfig", () => {
     const path = writeConfig(
       "mcp.json5",
       `{
-        mcpServers: {
-          local: {
-            type: "local",
-            command: "node",
-            args: ["./server.js", "--flag"],
+        openai: {
+          mcpServers: {
+            local: {
+              type: "local",
+              command: "node",
+              args: ["./server.js", "--flag"],
+            },
           },
         },
       }`,
     );
-    const config = await loadConfig(path, logger);
+    const config = await loadConfig(path, logger, "openai");
     const args = (config.mcpServers.local as any).args;
     expect(args[0]).toBe(join(tempDir, "server.js"));
     expect(args[1]).toBe("--flag");
@@ -93,16 +95,18 @@ describe("loadConfig", () => {
     const path = writeConfig(
       "abs.json5",
       `{
-        mcpServers: {
-          local: {
-            type: "local",
-            command: "node",
-            args: ["/usr/bin/server.js"],
+        anthropic: {
+          mcpServers: {
+            local: {
+              type: "local",
+              command: "node",
+              args: ["/usr/bin/server.js"],
+            },
           },
         },
       }`,
     );
-    const config = await loadConfig(path, logger);
+    const config = await loadConfig(path, logger, "anthropic");
     const args = (config.mcpServers.local as any).args;
     expect(args[0]).toBe("/usr/bin/server.js");
   });
@@ -112,7 +116,7 @@ describe("loadConfig", () => {
       "reason.json5",
       `{ reasoningEffort: "high" }`,
     );
-    const config = await loadConfig(path, logger);
+    const config = await loadConfig(path, logger, "openai");
     expect(config.reasoningEffort).toBe("high");
   });
 
@@ -121,13 +125,13 @@ describe("loadConfig", () => {
       "allowed.json5",
       `{ allowedCliTools: ["search", "read_file"] }`,
     );
-    const config = await loadConfig(path, logger);
+    const config = await loadConfig(path, logger, "openai");
     expect(config.allowedCliTools).toEqual(["search", "read_file"]);
   });
 
   it("converts bodyLimitMiB to bytes", async () => {
     const path = writeConfig("limit.json5", `{ bodyLimitMiB: 10 }`);
-    const config = await loadConfig(path, logger);
+    const config = await loadConfig(path, logger, "openai");
     expect(config.bodyLimit).toBe(10 * 1024 * 1024);
   });
 
@@ -135,13 +139,15 @@ describe("loadConfig", () => {
     const path = writeConfig(
       "bridge.json5",
       `{
-        toolBridge: {
-          command: "node",
-          args: ["./scripts/mcp-tool-bridge.mjs"],
+        anthropic: {
+          toolBridge: {
+            command: "node",
+            args: ["./scripts/mcp-tool-bridge.mjs"],
+          },
         },
       }`,
     );
-    const config = await loadConfig(path, logger);
+    const config = await loadConfig(path, logger, "anthropic");
     expect(config.toolBridge).toEqual({
       command: "node",
       args: [join(tempDir, "scripts/mcp-tool-bridge.mjs")],
@@ -150,29 +156,54 @@ describe("loadConfig", () => {
 
   it("defaults toolBridge to null when absent", async () => {
     const path = writeConfig("minimal.json5", `{}`);
-    const config = await loadConfig(path, logger);
+    const config = await loadConfig(path, logger, "openai");
     expect(config.toolBridge).toBeNull();
   });
 
   it("allows explicit null for toolBridge", async () => {
     const path = writeConfig(
       "null-bridge.json5",
-      `{ toolBridge: null }`,
+      `{ openai: { toolBridge: null } }`,
     );
-    const config = await loadConfig(path, logger);
+    const config = await loadConfig(path, logger, "openai");
     expect(config.toolBridge).toBeNull();
+  });
+
+  it("uses the correct provider section based on proxy", async () => {
+    const path = writeConfig(
+      "both.json5",
+      `{
+        openai: {
+          toolBridge: null,
+          mcpServers: {
+            xcode: { type: "local", command: "node", args: ["/xcode.js"], allowedTools: ["*"] },
+          },
+        },
+        anthropic: {
+          toolBridge: { command: "node", args: ["/bridge.mjs"] },
+          mcpServers: {},
+        },
+      }`,
+    );
+    const openai = await loadConfig(path, logger, "openai");
+    expect(openai.toolBridge).toBeNull();
+    expect(Object.keys(openai.mcpServers)).toEqual(["xcode"]);
+
+    const anthropic = await loadConfig(path, logger, "anthropic");
+    expect(anthropic.toolBridge).toEqual({ command: "node", args: ["/bridge.mjs"] });
+    expect(anthropic.mcpServers).toEqual({});
   });
 });
 
 describe("config validation", () => {
   it("rejects invalid bodyLimitMiB (negative)", async () => {
     const path = writeConfig("bad.json5", `{ bodyLimitMiB: -1 }`);
-    await expect(loadConfig(path, logger)).rejects.toThrow(/bodyLimitMiB.*>0/i);
+    await expect(loadConfig(path, logger, "openai")).rejects.toThrow(/bodyLimitMiB.*>0/i);
   });
 
   it("rejects invalid bodyLimitMiB (too large)", async () => {
     const path = writeConfig("bad.json5", `{ bodyLimitMiB: 200 }`);
-    await expect(loadConfig(path, logger)).rejects.toThrow(/100/i);
+    await expect(loadConfig(path, logger, "openai")).rejects.toThrow(/100/i);
   });
 
   it("rejects invalid reasoningEffort", async () => {
@@ -180,7 +211,7 @@ describe("config validation", () => {
       "bad.json5",
       `{ reasoningEffort: "invalid" }`,
     );
-    await expect(loadConfig(path, logger)).rejects.toThrow(/reasoningEffort/i);
+    await expect(loadConfig(path, logger, "openai")).rejects.toThrow(/reasoningEffort/i);
   });
 
   it("rejects non-array allowedCliTools", async () => {
@@ -188,7 +219,7 @@ describe("config validation", () => {
       "bad.json5",
       `{ allowedCliTools: "not-an-array" }`,
     );
-    await expect(loadConfig(path, logger)).rejects.toThrow(/array/i);
+    await expect(loadConfig(path, logger, "openai")).rejects.toThrow(/array/i);
   });
 
   it("rejects wildcard mixed with other entries in allowedCliTools", async () => {
@@ -204,40 +235,42 @@ describe("config validation", () => {
       "bad.json5",
       `{ autoApprovePermissions: ["invalid"] }`,
     );
-    await expect(loadConfig(path, logger)).rejects.toThrow(/invalid/i);
+    await expect(loadConfig(path, logger, "openai")).rejects.toThrow(/invalid/i);
   });
 
   it("rejects invalid MCP server (missing command)", async () => {
     const path = writeConfig(
       "bad.json5",
-      `{ mcpServers: { test: { args: [] } } }`,
+      `{ openai: { mcpServers: { test: { args: [] } } } }`,
     );
-    await expect(loadConfig(path, logger)).rejects.toThrow(/Invalid/i);
+    await expect(loadConfig(path, logger, "openai")).rejects.toThrow(/Invalid/i);
   });
 
   it("rejects invalid MCP server URL", async () => {
     const path = writeConfig(
       "bad.json5",
       `{
-        mcpServers: {
-          test: { type: "http", url: "not-a-url" }
+        openai: {
+          mcpServers: {
+            test: { type: "http", url: "not-a-url" }
+          }
         }
       }`,
     );
-    await expect(loadConfig(path, logger)).rejects.toThrow(/url/i);
+    await expect(loadConfig(path, logger, "openai")).rejects.toThrow(/url/i);
   });
 
   it("rejects invalid toolBridge (missing command)", async () => {
     const path = writeConfig(
       "bad.json5",
-      `{ toolBridge: { args: [] } }`,
+      `{ anthropic: { toolBridge: { args: [] } } }`,
     );
-    await expect(loadConfig(path, logger)).rejects.toThrow(/Invalid/i);
+    await expect(loadConfig(path, logger, "anthropic")).rejects.toThrow(/Invalid/i);
   });
 
   it("uses defaults for missing optional fields", async () => {
     const path = writeConfig("minimal.json5", `{}`);
-    const config = await loadConfig(path, logger);
+    const config = await loadConfig(path, logger, "openai");
     expect(config.toolBridge).toBeNull();
     expect(config.mcpServers).toEqual({});
     expect(config.allowedCliTools).toEqual([]);

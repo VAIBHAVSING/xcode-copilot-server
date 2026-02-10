@@ -19,7 +19,9 @@ export type {
   ToolBridgeServer,
 } from "./schemas/config.js";
 
-export type ServerConfig = Omit<RawServerConfig, "bodyLimitMiB"> & {
+export type ServerConfig = Omit<RawServerConfig, "bodyLimitMiB" | "openai" | "anthropic"> & {
+  toolBridge: ToolBridgeServer;
+  mcpServers: Record<string, MCPServer>;
   bodyLimit: number;
 };
 
@@ -68,9 +70,12 @@ function resolveBridgePaths(
   };
 }
 
+export type ProxyName = "openai" | "anthropic";
+
 export async function loadConfig(
   configPath: string,
   logger: Logger,
+  proxy: ProxyName,
 ): Promise<ServerConfig> {
   const absolutePath = isAbsolute(configPath)
     ? configPath
@@ -110,18 +115,16 @@ export async function loadConfig(
   }
 
   const configDir = dirname(absolutePath);
-  const { bodyLimitMiB, ...rest } = parseResult.data;
+  const parsed = parseResult.data;
+  const provider = parsed[proxy];
   const config: ServerConfig = {
-    ...rest,
-    bodyLimit: bodyLimitMiB * 1024 * 1024,
-    toolBridge: resolveBridgePaths(
-      parseResult.data.toolBridge,
-      configDir,
-    ),
-    mcpServers: resolveServerPaths(
-      parseResult.data.mcpServers,
-      configDir,
-    ),
+    allowedCliTools: parsed.allowedCliTools,
+    excludedFilePatterns: parsed.excludedFilePatterns,
+    autoApprovePermissions: parsed.autoApprovePermissions,
+    reasoningEffort: parsed.reasoningEffort,
+    bodyLimit: parsed.bodyLimitMiB * 1024 * 1024,
+    toolBridge: resolveBridgePaths(provider.toolBridge, configDir),
+    mcpServers: resolveServerPaths(provider.mcpServers, configDir),
   };
 
   const cliToolsSummary = config.allowedCliTools.includes("*")

@@ -43,9 +43,16 @@ export type ApprovalRule = z.infer<typeof ApprovalRuleSchema>;
 export type ReasoningEffort = z.infer<typeof ReasoningEffortSchema>;
 export type ToolBridgeServer = z.infer<typeof ToolBridgeServerSchema>;
 
-export const ServerConfigSchema = z.object({
+const ProviderConfigSchema = z.object({
   toolBridge: ToolBridgeServerSchema.optional().default(null),
   mcpServers: z.record(z.string(), MCPServerSchema).default({}),
+});
+
+export type ProviderConfig = z.infer<typeof ProviderConfigSchema>;
+
+export const ServerConfigSchema = z.object({
+  openai: ProviderConfigSchema.default({ toolBridge: null, mcpServers: {} }),
+  anthropic: ProviderConfigSchema.default({ toolBridge: null, mcpServers: {} }),
   allowedCliTools: z.array(z.string()).refine(
     (arr) => !arr.includes("*") || arr.length === 1,
     'allowedCliTools: use ["*"] alone to allow all tools, don\'t mix with other entries',
