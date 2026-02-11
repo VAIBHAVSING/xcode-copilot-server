@@ -13,11 +13,7 @@ interface PendingMCPRequest {
 export class ToolBridgeState {
   private cachedTools: AnthropicToolDefinition[] = [];
 
-  // Queues tool call IDs by name so we can match them to incoming MCP HTTP
-  // requests in the order the model issued them.
   private readonly expectedByName = new Map<string, string[]>();
-
-  // Once matched, holds the pending MCP request until Xcode sends the tool_result.
   private readonly pendingByCallId = new Map<string, PendingMCPRequest>();
 
   private reply: FastifyReply | null = null;
@@ -25,6 +21,7 @@ export class ToolBridgeState {
   private _onSessionEnd: (() => void) | null = null;
 
   private _sessionActive = false;
+  private _hadError = false;
 
   get currentReply(): FastifyReply | null {
     return this.reply;
@@ -46,11 +43,8 @@ export class ToolBridgeState {
     return this.cachedTools;
   }
 
-  /**
-   * The model sometimes hallucinates a shortened tool name (e.g. "XcodeRead"
-   * instead of "mcp__xcode-tools__XcodeRead"). Resolve against the cached
-   * tool list so Xcode receives the name it originally sent.
-   */
+  // the model sometimes hallucinates shortened tool names like "XcodeRead"
+  // so we resolve them against the cached list to match what Xcode sent
   resolveToolName(name: string): string {
     if (this.cachedTools.some((t) => t.name === name)) return name;
 
@@ -94,9 +88,6 @@ export class ToolBridgeState {
   ): void {
     const queue = this.expectedByName.get(name);
     if (!queue?.length) {
-      // The CLI always fires assistant.message before tool execution starts
-      // (it serializes tool calls), so an MCP request arriving without a
-      // matching expected entry means something went wrong.
       reject(new Error(`No expected tool call for "${name}"`));
       return;
     }
@@ -137,6 +128,14 @@ export class ToolBridgeState {
     return this._sessionActive;
   }
 
+  get hadError(): boolean {
+    return this._hadError;
+  }
+
+  markSessionErrored(): void {
+    this._hadError = true;
+  }
+
   markSessionActive(): void {
     this._sessionActive = true;
   }
@@ -144,10 +143,8 @@ export class ToolBridgeState {
   markSessionInactive(): void {
     this._sessionActive = false;
 
-    // Some tool calls never go through the MCP bridge (e.g. denied by the
-    // permission hook or handled internally by the CLI). Their stale entries
-    // would cause the next request to be treated as a continuation, hanging
-    // forever since no one resolves them.
+    // stale entries from tool calls that never went through the bridge
+    // (denied or handled internally) would hang the next continuation
     this.expectedByName.clear();
     for (const [, pending] of this.pendingByCallId) {
       clearTimeout(pending.timeout);

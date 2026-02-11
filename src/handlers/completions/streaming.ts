@@ -11,7 +11,7 @@ export async function handleStreaming(
   prompt: string,
   model: string,
   logger: Logger,
-): Promise<void> {
+): Promise<boolean> {
   reply.raw.writeHead(200, {
     "Content-Type": "text/event-stream",
     "Cache-Control": "no-cache",
@@ -43,7 +43,7 @@ export async function handleStreaming(
 
   sendChunk({ role: "assistant" }, null);
 
-  const { promise, resolve } = Promise.withResolvers<undefined>();
+  const { promise, resolve } = Promise.withResolvers<boolean>();
   let done = false;
 
   function cleanup(): void {
@@ -59,7 +59,7 @@ export async function handleStreaming(
       session.abort().catch((err: unknown) => {
         logger.error("Failed to abort session:", err);
       });
-      resolve(undefined);
+      resolve(false);
     }
   });
 
@@ -67,14 +67,11 @@ export async function handleStreaming(
     logger.warn("Stream timed out after 5 minutes");
     cleanup();
     reply.raw.end();
-    resolve(undefined);
+    resolve(false);
   }, REQUEST_TIMEOUT_MS);
 
-  // Buffer deltas so we can discard intermediate narration
-  // (e.g. "Let me search...") that precedes tool calls.
+  // buffer deltas so we can drop intermediate narration before tool calls
   let pendingDeltas: string[] = [];
-
-  // Track tool names by call ID so we can log them on completion
   const toolNames = new Map<string, string>();
 
   function flushPending(): void {
@@ -113,13 +110,11 @@ export async function handleStreaming(
 
       case "assistant.message":
         if (event.data.toolRequests && event.data.toolRequests.length > 0) {
-          // Intermediate turn, so discard buffered narration.
           logger.debug(
             `Calling tools (dropping buffered text): ${event.data.toolRequests.map((tr) => tr.name).join(", ")}`,
           );
           pendingDeltas = [];
         } else {
-          // Final turn, so flush buffered deltas to the client.
           flushPending();
         }
         break;
@@ -131,7 +126,7 @@ export async function handleStreaming(
         sendChunk({}, "stop");
         reply.raw.write("data: [DONE]\n\n");
         reply.raw.end();
-        resolve(undefined);
+        resolve(true);
         break;
 
       case "session.compaction_start":
@@ -146,7 +141,7 @@ export async function handleStreaming(
         logger.error(`Session error: ${event.data.message}`);
         cleanup();
         reply.raw.end();
-        resolve(undefined);
+        resolve(false);
         break;
     }
   });
@@ -157,7 +152,7 @@ export async function handleStreaming(
       cleanup();
       reply.raw.end();
     }
-    resolve(undefined);
+    resolve(false);
   });
 
   return promise;

@@ -24,6 +24,12 @@ describe("ConversationManager", () => {
       expect(conv.session).toBeNull();
       expect(conv.sentMessageCount).toBe(0);
       expect(conv.state).toBeDefined();
+      expect(conv.isPrimary).toBe(false);
+    });
+
+    it("marks conversation as primary when requested", () => {
+      const conv = createManager().create({ isPrimary: true });
+      expect(conv.isPrimary).toBe(true);
     });
 
     it("increments size", () => {
@@ -217,7 +223,7 @@ describe("ConversationManager", () => {
   });
 
   describe("auto-removal via onSessionEnd", () => {
-    it("removes conversation when session becomes inactive", () => {
+    it("removes non-primary conversation when session becomes inactive", () => {
       const manager = createManager();
       const conv = manager.create();
       conv.state.markSessionActive();
@@ -228,13 +234,105 @@ describe("ConversationManager", () => {
       expect(manager.getState(conv.id)).toBeUndefined();
     });
 
-    it("removes conversation on cleanup", () => {
+    it("removes non-primary conversation on cleanup", () => {
       const manager = createManager();
       const conv = manager.create();
 
       expect(manager.size).toBe(1);
       conv.state.cleanup();
       expect(manager.size).toBe(0);
+    });
+
+    it("does NOT auto-remove primary conversation on session idle", () => {
+      const manager = createManager();
+      const conv = manager.create({ isPrimary: true });
+      conv.state.markSessionActive();
+
+      expect(manager.size).toBe(1);
+      conv.state.markSessionInactive();
+      expect(manager.size).toBe(1);
+      expect(manager.getState(conv.id)).toBe(conv.state);
+      expect(manager.getPrimary()).toBe(conv);
+    });
+  });
+
+  describe("primary session", () => {
+    it("getPrimary returns null when no primary exists", () => {
+      expect(createManager().getPrimary()).toBeNull();
+    });
+
+    it("getPrimary returns the primary conversation", () => {
+      const manager = createManager();
+      const conv = manager.create({ isPrimary: true });
+      expect(manager.getPrimary()).toBe(conv);
+    });
+
+    it("clearPrimary removes the primary and cleans up state", () => {
+      const manager = createManager();
+      const conv = manager.create({ isPrimary: true });
+      expect(manager.size).toBe(1);
+
+      manager.clearPrimary();
+      expect(manager.size).toBe(0);
+      expect(manager.getPrimary()).toBeNull();
+      expect(manager.getState(conv.id)).toBeUndefined();
+    });
+
+    it("clearPrimary is a no-op when no primary exists", () => {
+      const manager = createManager();
+      manager.create();
+      expect(manager.size).toBe(1);
+      manager.clearPrimary();
+      expect(manager.size).toBe(1);
+    });
+
+    it("remove clears primaryId when removing the primary", () => {
+      const manager = createManager();
+      const conv = manager.create({ isPrimary: true });
+      manager.remove(conv.id);
+      expect(manager.getPrimary()).toBeNull();
+    });
+  });
+
+  describe("findForNewRequest", () => {
+    it("creates a new primary when none exists", () => {
+      const manager = createManager();
+      const { conversation, isReuse } = manager.findForNewRequest();
+      expect(isReuse).toBe(false);
+      expect(conversation.isPrimary).toBe(true);
+      expect(manager.getPrimary()).toBe(conversation);
+    });
+
+    it("reuses idle primary with a session", () => {
+      const manager = createManager();
+      const primary = manager.create({ isPrimary: true });
+      primary.session = { on: () => () => {} } as never;
+
+      const { conversation, isReuse } = manager.findForNewRequest();
+      expect(isReuse).toBe(true);
+      expect(conversation).toBe(primary);
+    });
+
+    it("creates isolated conversation when primary is busy", () => {
+      const manager = createManager();
+      const primary = manager.create({ isPrimary: true });
+      primary.session = { on: () => () => {} } as never;
+      primary.state.markSessionActive();
+
+      const { conversation, isReuse } = manager.findForNewRequest();
+      expect(isReuse).toBe(false);
+      expect(conversation.isPrimary).toBe(false);
+      expect(conversation).not.toBe(primary);
+      expect(manager.getPrimary()).toBe(primary);
+    });
+
+    it("creates isolated conversation when primary session is null (not yet created)", () => {
+      const manager = createManager();
+      manager.create({ isPrimary: true });
+
+      const { conversation, isReuse } = manager.findForNewRequest();
+      expect(isReuse).toBe(false);
+      expect(conversation.isPrimary).toBe(false);
     });
   });
 });

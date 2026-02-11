@@ -45,8 +45,6 @@ export function createMessagesHandler(
     const req = parseResult.data;
 
     // --- Continuation routing ---
-    // Check if this request continues an existing conversation (i.e. it
-    // contains tool_result blocks that match a pending tool call).
     const existingConv = manager.findByContinuation(req.messages);
 
     if (existingConv) {
@@ -69,22 +67,19 @@ export function createMessagesHandler(
       return;
     }
 
-    // --- New conversation ---
-    const conversation = manager.create();
+    // --- New request or reuse primary ---
+    const { conversation, isReuse } = manager.findForNewRequest();
     const state = conversation.state;
+    state.markSessionActive();
 
-    logger.info(`New conversation ${conversation.id}`);
+    logger.info(
+      isReuse
+        ? `Reusing primary conversation ${conversation.id}`
+        : `New conversation ${conversation.id}`,
+    );
 
-    const systemMessage = extractAnthropicSystem(req.system);
     const tools = req.tools;
     const hasTools = !!tools?.length;
-
-    logger.debug(`System message length: ${String(systemMessage?.length ?? 0)} chars`);
-    logger.debug(`System message: ${systemMessage ?? "(none)"}`);
-    logger.debug(`Tools in request: ${tools ? String(tools.length) : "0"}`);
-    if (tools) {
-      logger.debug(`Tool names: ${tools.map((t) => t.name).join(", ")}`);
-    }
 
     if (tools?.length) {
       state.cacheTools(tools);
@@ -100,70 +95,88 @@ export function createMessagesHandler(
         "invalid_request_error",
         err instanceof Error ? err.message : String(err),
       );
-      manager.remove(conversation.id);
+      if (isReuse) {
+        state.markSessionInactive();
+      } else {
+        manager.remove(conversation.id);
+      }
       return;
     }
 
-    logger.debug(`Final prompt length: ${String(prompt.length)} chars`);
-    logger.debug(`Final prompt: ${prompt}`);
+    logger.debug(`Prompt (${isReuse ? "incremental" : "full"}): ${String(prompt.length)} chars`);
 
-    let copilotModel = req.model;
-    let supportsReasoningEffort = false;
-    try {
-      const models = await service.listModels();
-      const resolved = resolveModel(req.model, models, logger);
-      if (!resolved) {
-        sendError(
-          reply,
-          400,
-          "invalid_request_error",
-          `Model "${req.model}" is not available. Available models: ${models.map((m) => m.id).join(", ")}`,
-        );
+    if (!isReuse) {
+      const systemMessage = extractAnthropicSystem(req.system);
+
+      logger.debug(`System message length: ${String(systemMessage?.length ?? 0)} chars`);
+      logger.debug(`Tools in request: ${tools ? String(tools.length) : "0"}`);
+      if (tools) {
+        logger.debug(`Tool names: ${tools.map((t) => t.name).join(", ")}`);
+      }
+
+      let copilotModel = req.model;
+      let supportsReasoningEffort = false;
+      try {
+        const models = await service.listModels();
+        const resolved = resolveModel(req.model, models, logger);
+        if (!resolved) {
+          sendError(
+            reply,
+            400,
+            "invalid_request_error",
+            `Model "${req.model}" is not available. Available models: ${models.map((m) => m.id).join(", ")}`,
+          );
+          manager.remove(conversation.id);
+          return;
+        }
+        copilotModel = resolved;
+
+        if (config.reasoningEffort) {
+          const modelInfo = models.find((m) => m.id === copilotModel);
+          supportsReasoningEffort =
+            modelInfo?.capabilities.supports.reasoningEffort ?? false;
+          if (!supportsReasoningEffort) {
+            logger.debug(
+              `Model "${copilotModel}" does not support reasoning effort, ignoring config`,
+            );
+          }
+        }
+      } catch (err) {
+        logger.warn("Failed to list models, passing model through as-is:", err);
+      }
+
+      const toolBridgeServer = hasTools ? config.toolBridge : undefined;
+
+      if (toolBridgeServer) {
+        logger.info(`Tool bridge server: ${toolBridgeServer.command} ${toolBridgeServer.args.join(" ")}`);
+      }
+
+      const sessionConfig = createSessionConfig({
+        model: copilotModel,
+        systemMessage,
+        logger,
+        config,
+        supportsReasoningEffort,
+        cwd: service.cwd,
+        toolBridgeServer,
+        port,
+        conversationId: conversation.id,
+      });
+
+      try {
+        conversation.session = await service.createSession(sessionConfig);
+      } catch (err) {
+        logger.error("Creating session failed:", err);
+        sendError(reply, 500, "api_error", "Failed to create session");
         manager.remove(conversation.id);
         return;
       }
-      copilotModel = resolved;
-
-      if (config.reasoningEffort) {
-        const modelInfo = models.find((m) => m.id === copilotModel);
-        supportsReasoningEffort =
-          modelInfo?.capabilities.supports.reasoningEffort ?? false;
-        if (!supportsReasoningEffort) {
-          logger.debug(
-            `Model "${copilotModel}" does not support reasoning effort, ignoring config`,
-          );
-        }
-      }
-    } catch (err) {
-      logger.warn("Failed to list models, passing model through as-is:", err);
     }
 
-    const toolBridgeServer = hasTools ? config.toolBridge : undefined;
-
-    if (toolBridgeServer) {
-      logger.info(`Tool bridge server: ${toolBridgeServer.command} ${toolBridgeServer.args.join(" ")}`);
-    }
-
-    const sessionConfig = createSessionConfig({
-      model: copilotModel,
-      systemMessage,
-      logger,
-      config,
-      supportsReasoningEffort,
-      cwd: service.cwd,
-      toolBridgeServer,
-      port,
-      conversationId: conversation.id,
-    });
-
-    let session;
-    try {
-      session = await service.createSession(sessionConfig);
-      conversation.session = session;
-    } catch (err) {
-      logger.error("Creating session failed:", err);
-      sendError(reply, 500, "api_error", "Failed to create session");
-      manager.remove(conversation.id);
+    if (!conversation.session) {
+      logger.error("Primary conversation has no session, clearing");
+      manager.clearPrimary();
+      sendError(reply, 500, "api_error", "Session lost, please retry");
       return;
     }
 
@@ -171,10 +184,17 @@ export function createMessagesHandler(
 
     try {
       logger.info(`Streaming response for conversation ${conversation.id}`);
-      await handleAnthropicStreaming(state, session, prompt, req.model, logger, hasTools);
+      await handleAnthropicStreaming(state, conversation.session, prompt, req.model, logger, hasTools);
       conversation.sentMessageCount = req.messages.length;
+
+      if (conversation.isPrimary && state.hadError) {
+        manager.clearPrimary();
+      }
     } catch (err) {
       logger.error("Request failed:", err);
+      if (conversation.isPrimary) {
+        manager.clearPrimary();
+      }
       if (!reply.sent) {
         sendError(
           reply,

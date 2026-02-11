@@ -13,8 +13,7 @@ import type { ToolBridgeState } from "../../tool-bridge/state.js";
 
 const MCP_PREFIX = "xcode-bridge-";
 
-// The CLI prefixes MCP tool names with "xcode-bridge-" so we strip that
-// before sending to Xcode, otherwise tool names won't match what Xcode expects.
+// Xcode doesn't know about the "xcode-bridge-" prefix the CLI adds
 function stripMCPPrefix(name: string): string {
   return name.startsWith(MCP_PREFIX) ? name.slice(MCP_PREFIX.length) : name;
 }
@@ -30,8 +29,6 @@ function sendEvent(reply: FastifyReply, type: string, data: unknown): void {
   reply.raw.write(`event: ${type}\ndata: ${JSON.stringify(data)}\n\n`);
 }
 
-// The text content block is started lazily once we actually have deltas to send,
-// so this only emits the message_start envelope.
 export function startReply(reply: FastifyReply, model: string): void {
   reply.raw.writeHead(200, SSE_HEADERS);
 
@@ -114,7 +111,6 @@ export async function handleAnthropicStreaming(
     r: FastifyReply,
     toolRequests: Array<{ toolCallId: string; name: string; arguments?: unknown }>,
   ): void {
-    // Close the text block first if one was started (model said text before tools)
     let startIndex: number;
     if (textBlockStarted) {
       sendEvent(r, "content_block_stop", {
@@ -196,9 +192,7 @@ export async function handleAnthropicStreaming(
         logger.debug(`assistant.message: toolRequests=${String(event.data.toolRequests?.length ?? 0)}, content=${JSON.stringify(event.data)}`);
 
         if (event.data.toolRequests && event.data.toolRequests.length > 0) {
-          // Only forward tools that came through the MCP shim when the bridge
-          // is active, since non-bridge tools (e.g. report_intent) are denied
-          // by the onPreToolUse hook and handled internally by the CLI.
+          // non-bridge tools (e.g. report_intent) are handled internally by the CLI
           const bridgeRequests = hasBridge
             ? event.data.toolRequests.filter((tr) => tr.name.startsWith(MCP_PREFIX))
             : event.data.toolRequests;
@@ -208,17 +202,15 @@ export async function handleAnthropicStreaming(
             logger.debug(`Skipped ${String(skipped)} non-bridge tool request(s) (handled internally by CLI)`);
           }
 
-          // Strip MCP prefix and resolve hallucinated names so the tool_use
-          // blocks sent to Xcode match the names it originally provided.
+          // Xcode needs to see the names it originally sent
           const stripped = bridgeRequests.map((tr) => ({
             ...tr,
             name: state.resolveToolName(stripMCPPrefix(tr.name)),
           }));
 
           if (stripped.length > 0) {
-            // Register expected tools even without a reply so that incoming MCP
-            // requests can still be matched, e.g. when the model retried a tool
-            // after an internal failure.
+            // register even without a reply because the model might have retried
+            // a tool after an internal failure
             for (const tr of stripped) {
               logger.info(`Tool request: name="${tr.name}", id="${tr.toolCallId}", args=${JSON.stringify(tr.arguments)}`);
               state.registerExpected(tr.toolCallId, tr.name);
@@ -226,22 +218,13 @@ export async function handleAnthropicStreaming(
 
             const r = getReply();
             if (r) {
-              // Flush any accumulated text before tool_use blocks (preserves
-              // the model's text like "Let me read the file" alongside tools)
               flushPending();
               emitToolUseBlocks(r, stripped);
               finishReply(r, "tool_use");
             } else {
-              // No reply available because the model retried a tool after an
-              // internal CLI failure. The MCP shim will still call
-              // /internal/tool-call and the next continuation from Xcode will
-              // provide the result.
               logger.debug("assistant.message with tool requests but no reply (internal retry), registered expected tools");
             }
           } else {
-            // All tool requests were non-bridge (denied by hook), so don't
-            // emit any tool_use blocks. The CLI handles the denials internally
-            // and the model will continue with another response.
             logger.debug("All tool requests were non-bridge, no tool_use blocks emitted");
           }
         } else {
@@ -261,7 +244,7 @@ export async function handleAnthropicStreaming(
         flushPending();
         const r = getReply();
         if (r) {
-          // Ensure at least one content block for spec compliance
+          // spec requires at least one content block
           if (!textBlockStarted) {
             ensureTextBlock(r);
           }
@@ -282,6 +265,7 @@ export async function handleAnthropicStreaming(
       case "session.error": {
         logger.error(`Session error: ${event.data.message}`);
         sessionDone = true;
+        state.markSessionErrored();
         state.markSessionInactive();
         const r = getReply();
         if (r) {
@@ -311,6 +295,7 @@ export async function handleAnthropicStreaming(
     if (!sessionDone && state.currentReply === reply) {
       logger.info("Client disconnected, aborting session");
       textBlockStarted = false;
+      state.markSessionErrored();
       state.cleanup();
       unsubscribe();
       session.abort().catch((err: unknown) => {

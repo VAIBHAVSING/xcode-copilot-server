@@ -17,6 +17,7 @@ function sendError(
 
 export function createCompletionsHandler({ service, logger, config }: AppContext) {
   let sentMessageCount = 0;
+  let cachedSession: CopilotSession | null = null;
 
   return async function handleCompletions(
     request: FastifyRequest,
@@ -51,50 +52,64 @@ export function createCompletionsHandler({ service, logger, config }: AppContext
       return;
     }
 
-    const systemMessage =
-      systemParts.length > 0 ? systemParts.join("\n\n") : undefined;
-
-    let supportsReasoningEffort = false;
-    if (config.reasoningEffort) {
-      try {
-        const models = await service.listModels();
-        const modelInfo = models.find((m) => m.id === req.model);
-        supportsReasoningEffort =
-          modelInfo?.capabilities.supports.reasoningEffort ?? false;
-        if (!supportsReasoningEffort) {
-          logger.debug(
-            `Model "${req.model}" does not support reasoning effort, ignoring config`,
-          );
-        }
-      } catch (err) {
-        logger.warn("Failed to check model capabilities:", err);
-      }
-    }
-
-    const sessionConfig = createSessionConfig({
-      model: req.model,
-      systemMessage,
-      logger,
-      config,
-      supportsReasoningEffort,
-      cwd: service.cwd,
-    });
-
     let session: CopilotSession;
-    try {
-      session = await service.createSession(sessionConfig);
-    } catch (err) {
-      logger.error("Getting session failed:", err);
-      sendError(reply, 500, "api_error", "Failed to create session");
-      return;
+
+    if (cachedSession) {
+      logger.info("Reusing cached session");
+      session = cachedSession;
+    } else {
+      const systemMessage =
+        systemParts.length > 0 ? systemParts.join("\n\n") : undefined;
+
+      let supportsReasoningEffort = false;
+      if (config.reasoningEffort) {
+        try {
+          const models = await service.listModels();
+          const modelInfo = models.find((m) => m.id === req.model);
+          supportsReasoningEffort =
+            modelInfo?.capabilities.supports.reasoningEffort ?? false;
+          if (!supportsReasoningEffort) {
+            logger.debug(
+              `Model "${req.model}" does not support reasoning effort, ignoring config`,
+            );
+          }
+        } catch (err) {
+          logger.warn("Failed to check model capabilities:", err);
+        }
+      }
+
+      const sessionConfig = createSessionConfig({
+        model: req.model,
+        systemMessage,
+        logger,
+        config,
+        supportsReasoningEffort,
+        cwd: service.cwd,
+      });
+
+      try {
+        session = await service.createSession(sessionConfig);
+        cachedSession = session;
+      } catch (err) {
+        logger.error("Getting session failed:", err);
+        sendError(reply, 500, "api_error", "Failed to create session");
+        return;
+      }
     }
 
     try {
       logger.info("Streaming response");
-      await handleStreaming(reply, session, prompt, req.model, logger);
-      sentMessageCount = req.messages.length;
+      const healthy = await handleStreaming(reply, session, prompt, req.model, logger);
+      if (healthy) {
+        sentMessageCount = req.messages.length;
+      } else {
+        cachedSession = null;
+        sentMessageCount = 0;
+      }
     } catch (err) {
       logger.error("Request failed:", err);
+      cachedSession = null;
+      sentMessageCount = 0;
       if (!reply.sent) {
         sendError(reply, 500, "api_error", err instanceof Error ? err.message : "Internal error");
       }

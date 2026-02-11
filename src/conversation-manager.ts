@@ -9,40 +9,76 @@ export interface Conversation {
   state: ToolBridgeState;
   session: CopilotSession | null;
   sentMessageCount: number;
+  isPrimary: boolean;
 }
 
 export class ConversationManager {
   private readonly conversations = new Map<string, Conversation>();
   private readonly logger: Logger;
+  private primaryId: string | null = null;
 
   constructor(logger: Logger) {
     this.logger = logger;
   }
 
-  create(): Conversation {
+  create(options?: { isPrimary?: boolean }): Conversation {
     const id = randomUUID();
+    const isPrimary = options?.isPrimary ?? false;
     const state = new ToolBridgeState();
     const conversation: Conversation = {
       id,
       state,
       session: null,
       sentMessageCount: 0,
+      isPrimary,
     };
     this.conversations.set(id, conversation);
 
-    state.onSessionEnd(() => {
-      this.logger.debug(`Conversation ${id} session ended, removing`);
-      this.conversations.delete(id);
-    });
+    if (!isPrimary) {
+      state.onSessionEnd(() => {
+        this.logger.debug(`Conversation ${id} session ended, removing`);
+        this.conversations.delete(id);
+      });
+    }
 
-    this.logger.debug(`Created conversation ${id} (active: ${String(this.conversations.size)})`);
+    if (isPrimary) {
+      this.primaryId = id;
+    }
+
+    this.logger.debug(`Created conversation ${id} (primary=${String(isPrimary)}, active: ${String(this.conversations.size)})`);
     return conversation;
   }
 
-  /**
-   * Find a conversation that owns the tool_result blocks in the incoming
-   * messages. Returns undefined if no match (meaning this is a new request).
-   */
+  getPrimary(): Conversation | null {
+    if (!this.primaryId) return null;
+    return this.conversations.get(this.primaryId) ?? null;
+  }
+
+  clearPrimary(): void {
+    if (this.primaryId) {
+      const conv = this.conversations.get(this.primaryId);
+      if (conv) {
+        conv.state.cleanup();
+        this.conversations.delete(this.primaryId);
+        this.logger.debug(`Cleared primary conversation ${this.primaryId} (active: ${String(this.conversations.size)})`);
+      }
+      this.primaryId = null;
+    }
+  }
+
+  findForNewRequest(): { conversation: Conversation; isReuse: boolean } {
+    const primary = this.getPrimary();
+    if (primary) {
+      if (primary.state.sessionActive || !primary.session) {
+        this.logger.debug(`Primary ${primary.id} is unavailable, creating isolated conversation`);
+        return { conversation: this.create(), isReuse: false };
+      }
+      this.logger.debug(`Reusing primary conversation ${primary.id}`);
+      return { conversation: primary, isReuse: true };
+    }
+    return { conversation: this.create({ isPrimary: true }), isReuse: false };
+  }
+
   findByContinuation(messages: AnthropicMessage[]): Conversation | undefined {
     const lastMsg = messages[messages.length - 1];
     if (!lastMsg || lastMsg.role !== "user" || typeof lastMsg.content === "string") {
@@ -67,8 +103,8 @@ export class ConversationManager {
       }
     }
 
-    // Fallback: if no tool_result match, check for any conversation with
-    // sessionActive (e.g. the model retried a tool after an internal failure).
+    // the model sometimes retries a tool after an internal failure so the
+    // tool_use_id won't match anything, but we can still route by session
     for (const [, conv] of this.conversations) {
       if (conv.state.sessionActive) {
         this.logger.debug(`Continuation matched conversation ${conv.id} via sessionActive fallback`);
@@ -79,10 +115,6 @@ export class ConversationManager {
     return undefined;
   }
 
-  /**
-   * Find a conversation state that expects a tool call with the given name.
-   * Used by POST /internal/:convId/tool-call fallback routing.
-   */
   findByExpectedTool(name: string): ToolBridgeState | undefined {
     for (const [, conv] of this.conversations) {
       if (conv.state.hasExpectedTool(name)) {
@@ -101,6 +133,9 @@ export class ConversationManager {
     if (conv) {
       conv.state.cleanup();
       this.conversations.delete(convId);
+      if (convId === this.primaryId) {
+        this.primaryId = null;
+      }
       this.logger.debug(`Removed conversation ${convId} (active: ${String(this.conversations.size)})`);
     }
   }
