@@ -341,6 +341,54 @@ describe("tool filtering", () => {
     expect(result).toEqual({ permissionDecision: "deny" });
     expect(config.mcpServers).toEqual({});
   });
+
+  it("appends --port and --conv-id CLI args to bridge args", () => {
+    const config = createSessionConfig({
+      model: "gpt-4",
+      logger,
+      config: makeConfig(),
+      supportsReasoningEffort: false,
+      toolBridgeServer: { command: "node", args: ["/path/to/bridge.mjs"] },
+      port: 9090,
+      conversationId: "conv-abc-123",
+    });
+    const bridge = config.mcpServers?.["xcode-bridge"] as { args: string[] };
+    expect(bridge.args).toEqual([
+      "/path/to/bridge.mjs",
+      "--port=9090",
+      "--conv-id=conv-abc-123",
+    ]);
+  });
+
+  it("omits --conv-id when conversationId is not provided", () => {
+    const config = createSessionConfig({
+      model: "gpt-4",
+      logger,
+      config: makeConfig(),
+      supportsReasoningEffort: false,
+      toolBridgeServer: { command: "node", args: ["/path/to/bridge.mjs"] },
+      port: 8080,
+    });
+    const bridge = config.mcpServers?.["xcode-bridge"] as { args: string[] };
+    expect(bridge.args).toEqual([
+      "/path/to/bridge.mjs",
+      "--port=8080",
+    ]);
+  });
+
+  it("defaults port to 8080 in CLI args when port is not provided", () => {
+    const config = createSessionConfig({
+      model: "gpt-4",
+      logger,
+      config: makeConfig(),
+      supportsReasoningEffort: false,
+      toolBridgeServer: { command: "node", args: ["/path/to/bridge.mjs"] },
+      conversationId: "conv-xyz",
+    });
+    const bridge = config.mcpServers?.["xcode-bridge"] as { args: string[] };
+    expect(bridge.args).toContain("--port=8080");
+    expect(bridge.args).toContain("--conv-id=conv-xyz");
+  });
 });
 
 describe("onUserInputRequest", () => {

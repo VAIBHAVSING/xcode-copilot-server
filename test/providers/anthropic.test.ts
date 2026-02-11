@@ -228,7 +228,7 @@ describe("Anthropic provider — /v1/messages happy path", () => {
           },
         },
       ]),
-      getSession: vi.fn().mockResolvedValue(mockSession),
+      createSession: vi.fn().mockResolvedValue(mockSession),
     };
 
     const streamCtx: AppContext = {
