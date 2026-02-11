@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { CopilotSession } from "@github/copilot-sdk";
 import { ToolBridgeState } from "./tool-bridge/state.js";
-import type { AnthropicMessage, ContentBlock } from "./schemas/anthropic.js";
+import type { AnthropicMessage } from "./schemas/anthropic.js";
 import type { Logger } from "./logger.js";
 
 export interface Conversation {
@@ -86,7 +86,7 @@ export class ConversationManager {
     }
 
     const toolUseIds: string[] = [];
-    for (const block of lastMsg.content as ContentBlock[]) {
+    for (const block of lastMsg.content) {
       if (block.type === "tool_result") {
         toolUseIds.push(block.tool_use_id);
       }
