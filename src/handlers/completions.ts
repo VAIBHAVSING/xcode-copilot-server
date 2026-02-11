@@ -5,15 +5,7 @@ import { ChatCompletionRequestSchema, extractContentText } from "../schemas/open
 import { formatPrompt } from "../utils/prompt.js";
 import { createSessionConfig } from "./session-config.js";
 import { handleStreaming } from "./completions/streaming.js";
-
-function sendError(
-  reply: FastifyReply,
-  status: number,
-  type: "invalid_request_error" | "api_error",
-  message: string,
-): void {
-  reply.status(status).send({ error: { message, type } });
-}
+import { sendOpenAIError as sendError } from "./errors.js";
 
 export function createCompletionsHandler({ service, logger, config }: AppContext, manager: ConversationManager) {
   return async function handleCompletions(

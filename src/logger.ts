@@ -9,12 +9,6 @@ export const LEVEL_PRIORITY = {
 
 export type LogLevel = keyof typeof LEVEL_PRIORITY;
 
-export function formatCompaction(data: unknown): string {
-  if (!data || typeof data !== "object") return "compaction data unavailable";
-  const cd = data as Record<string, unknown>;
-  return `${String(cd["preCompactionTokens"])} to ${String(cd["postCompactionTokens"])} tokens`;
-}
-
 export class Logger {
   readonly level: LogLevel;
   private threshold: number;

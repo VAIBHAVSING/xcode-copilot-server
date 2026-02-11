@@ -1,6 +1,7 @@
 import type { FastifyReply } from "fastify";
 import type { CopilotSession } from "@github/copilot-sdk";
-import { formatCompaction, type Logger } from "../../logger.js";
+import type { Logger } from "../../logger.js";
+import { formatCompaction, SSE_HEADERS, sendSSEEvent as sendEvent } from "../streaming-utils.js";
 import type {
   MessageStartEvent,
   ContentBlockStartEvent,
@@ -16,17 +17,6 @@ const MCP_PREFIX = "xcode-bridge-";
 // Xcode doesn't know about the "xcode-bridge-" prefix the CLI adds
 function stripMCPPrefix(name: string): string {
   return name.startsWith(MCP_PREFIX) ? name.slice(MCP_PREFIX.length) : name;
-}
-
-const SSE_HEADERS = {
-  "Content-Type": "text/event-stream",
-  "Cache-Control": "no-cache",
-  Connection: "keep-alive",
-  "X-Accel-Buffering": "no",
-} as const satisfies Record<string, string>;
-
-function sendEvent(reply: FastifyReply, type: string, data: unknown): void {
-  reply.raw.write(`event: ${type}\ndata: ${JSON.stringify(data)}\n\n`);
 }
 
 export function startReply(reply: FastifyReply, model: string): void {

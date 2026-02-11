@@ -1,6 +1,7 @@
 import type { FastifyReply } from "fastify";
 import type { CopilotSession } from "@github/copilot-sdk";
-import { formatCompaction, type Logger } from "../../logger.js";
+import type { Logger } from "../../logger.js";
+import { formatCompaction, SSE_HEADERS } from "../streaming-utils.js";
 import { currentTimestamp, type ChatCompletionMessage, type ChatCompletionChunk } from "../../schemas/openai.js";
 
 const REQUEST_TIMEOUT_MS = 5 * 60 * 1000;
@@ -12,12 +13,7 @@ export async function handleStreaming(
   model: string,
   logger: Logger,
 ): Promise<boolean> {
-  reply.raw.writeHead(200, {
-    "Content-Type": "text/event-stream",
-    "Cache-Control": "no-cache",
-    Connection: "keep-alive",
-    "X-Accel-Buffering": "no",
-  });
+  reply.raw.writeHead(200, SSE_HEADERS);
 
   const completionId = `chatcmpl-${String(Date.now())}`;
 

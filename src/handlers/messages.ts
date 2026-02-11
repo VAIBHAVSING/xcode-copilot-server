@@ -10,18 +10,7 @@ import { createSessionConfig } from "./session-config.js";
 import type { ConversationManager } from "../conversation-manager.js";
 import { resolveToolResults } from "./messages/tool-result-handler.js";
 import { handleAnthropicStreaming, startReply } from "./messages/streaming.js";
-
-function sendError(
-  reply: FastifyReply,
-  status: number,
-  type: "invalid_request_error" | "api_error",
-  message: string,
-): void {
-  reply.status(status).send({
-    type: "error",
-    error: { type, message },
-  });
-}
+import { sendAnthropicError as sendError } from "./errors.js";
 
 export function createMessagesHandler(
   { service, logger, config, port }: AppContext,

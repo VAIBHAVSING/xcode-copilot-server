@@ -5,6 +5,7 @@ import {
   AnthropicMessagesRequestSchema,
   type AnthropicMessagesRequest,
 } from "../../schemas/anthropic.js";
+import { sendAnthropicError } from "../errors.js";
 
 // Flattens everything into a single string so we can run the token estimator
 // over the full request content.
@@ -69,13 +70,7 @@ export function createCountTokensHandler({ logger }: AppContext) {
     const parseResult = AnthropicMessagesRequestSchema.safeParse(request.body);
     if (!parseResult.success) {
       const firstIssue = parseResult.error.issues[0];
-      void reply.status(400).send({
-        type: "error",
-        error: {
-          type: "invalid_request_error",
-          message: firstIssue?.message ?? "Invalid request body",
-        },
-      });
+      sendAnthropicError(reply, 400, "invalid_request_error", firstIssue?.message ?? "Invalid request body");
       return;
     }
 
