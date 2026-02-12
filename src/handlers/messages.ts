@@ -69,6 +69,7 @@ export function createMessagesHandler(
 
     const tools = req.tools;
     const hasTools = !!tools?.length;
+    const hasBridge = hasTools && !!config.toolBridge;
 
     if (tools?.length) {
       state.cacheTools(tools);
@@ -134,10 +135,8 @@ export function createMessagesHandler(
         logger.warn("Failed to list models, passing model through as-is:", err);
       }
 
-      const toolBridgeServer = hasTools ? config.toolBridge : undefined;
-
-      if (toolBridgeServer) {
-        logger.info(`Tool bridge server: ${toolBridgeServer.command} ${toolBridgeServer.args.join(" ")}`);
+      if (hasBridge) {
+        logger.info("Tool bridge active (in-process MCP)");
       }
 
       const sessionConfig = createSessionConfig({
@@ -147,7 +146,7 @@ export function createMessagesHandler(
         config,
         supportsReasoningEffort,
         cwd: service.cwd,
-        toolBridgeServer,
+        hasToolBridge: hasBridge,
         port,
         conversationId: conversation.id,
       });
@@ -173,7 +172,7 @@ export function createMessagesHandler(
 
     try {
       logger.info(`Streaming response for conversation ${conversation.id}`);
-      await handleAnthropicStreaming(state, conversation.session, prompt, req.model, logger, hasTools);
+      await handleAnthropicStreaming(state, conversation.session, prompt, req.model, logger, hasBridge);
       conversation.sentMessageCount = req.messages.length;
 
       if (conversation.isPrimary && state.hadError) {

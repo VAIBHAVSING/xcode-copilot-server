@@ -91,8 +91,8 @@ export function currentTimestamp(): number {
   return Math.floor(Date.now() / 1000);
 }
 
-// Throws on malformed or unsupported content types so callers can surface
-// a 400 error back to the client.
+// We only support text content, so this rejects anything else early
+// and lets the caller surface a 400.
 export function extractContentText(content: ChatCompletionMessage["content"]): string {
   if (content == null) {
     return "";

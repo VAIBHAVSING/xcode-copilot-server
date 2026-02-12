@@ -68,13 +68,14 @@ describe("Anthropic provider — user-agent check", () => {
     expect(res.statusCode).toBe(403);
   });
 
-  it("skips UA check for /internal/ routes", async () => {
+  it("skips UA check for /mcp/ routes", async () => {
     const res = await app.inject({
-      method: "GET",
-      url: "/internal/tools",
+      method: "POST",
+      url: "/mcp/test-conv",
       headers: {},
+      payload: { jsonrpc: "2.0", id: 1, method: "initialize" },
     });
-    // Should not be 403 since no UA is required for internal routes
+    // Should not be 403 since no UA is required for MCP routes
     expect(res.statusCode).not.toBe(403);
   });
 });

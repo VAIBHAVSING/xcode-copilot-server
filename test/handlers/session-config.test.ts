@@ -286,7 +286,7 @@ describe("tool filtering", () => {
       logger,
       config: makeConfig(),
       supportsReasoningEffort: false,
-      toolBridgeServer: { command: "node", args: ["/path/to/mcp-tool-bridge.mjs"] },
+      hasToolBridge: true,
       port: 8080,
     });
     const result = await config.hooks!.onPreToolUse!(toolUseInput("xcode-bridge-Read"), invocation);
@@ -299,7 +299,7 @@ describe("tool filtering", () => {
       logger,
       config: makeConfig({ allowedCliTools: ["glob", "grep"] }),
       supportsReasoningEffort: false,
-      toolBridgeServer: { command: "node", args: ["/path/to/mcp-tool-bridge.mjs"] },
+      hasToolBridge: true,
       port: 8080,
     });
     // Bridge tools allowed
@@ -313,23 +313,23 @@ describe("tool filtering", () => {
     expect(denied).toEqual({ permissionDecision: "deny" });
   });
 
-  it("does not activate bridge when toolBridgeServer is null", async () => {
+  it("does not activate bridge when hasToolBridge is false", async () => {
     const config = createSessionConfig({
       model: "gpt-4",
       logger,
       config: makeConfig({ allowedCliTools: [] }),
       supportsReasoningEffort: false,
-      toolBridgeServer: null,
+      hasToolBridge: false,
       port: 8080,
     });
-    // No bridge server, so xcode-bridge-* tools are denied
+    // No bridge, so xcode-bridge-* tools are denied
     const result = await config.hooks!.onPreToolUse!(toolUseInput("xcode-bridge-Read"), invocation);
     expect(result).toEqual({ permissionDecision: "deny" });
     // No xcode-bridge MCP server entry
     expect(config.mcpServers).toEqual({});
   });
 
-  it("does not activate bridge when toolBridgeServer is undefined", async () => {
+  it("does not activate bridge when hasToolBridge is omitted", async () => {
     const config = createSessionConfig({
       model: "gpt-4",
       logger,
@@ -342,36 +342,33 @@ describe("tool filtering", () => {
     expect(config.mcpServers).toEqual({});
   });
 
-  it("appends --port and --conv-id CLI args to bridge args", () => {
+  it("sets HTTP MCP URL with port and conversationId", () => {
     const config = createSessionConfig({
       model: "gpt-4",
       logger,
       config: makeConfig(),
       supportsReasoningEffort: false,
-      toolBridgeServer: { command: "node", args: ["/path/to/bridge.mjs"] },
+      hasToolBridge: true,
       port: 9090,
       conversationId: "conv-abc-123",
     });
-    const bridge = config.mcpServers?.["xcode-bridge"] as { args: string[] };
-    expect(bridge.args).toEqual([
-      "/path/to/bridge.mjs",
-      "--port=9090",
-      "--conv-id=conv-abc-123",
-    ]);
+    const bridge = config.mcpServers?.["xcode-bridge"] as { type: string; url: string; tools: string[] };
+    expect(bridge.type).toBe("http");
+    expect(bridge.url).toBe("http://127.0.0.1:9090/mcp/conv-abc-123");
+    expect(bridge.tools).toEqual(["*"]);
   });
 
-  it("defaults port to 8080 in CLI args when port is not provided", () => {
+  it("defaults port to 8080 and conversationId to empty in MCP URL", () => {
     const config = createSessionConfig({
       model: "gpt-4",
       logger,
       config: makeConfig(),
       supportsReasoningEffort: false,
-      toolBridgeServer: { command: "node", args: ["/path/to/bridge.mjs"] },
-      conversationId: "conv-xyz",
+      hasToolBridge: true,
     });
-    const bridge = config.mcpServers?.["xcode-bridge"] as { args: string[] };
-    expect(bridge.args).toContain("--port=8080");
-    expect(bridge.args).toContain("--conv-id=conv-xyz");
+    const bridge = config.mcpServers?.["xcode-bridge"] as { type: string; url: string };
+    expect(bridge.type).toBe("http");
+    expect(bridge.url).toBe("http://127.0.0.1:8080/mcp/");
   });
 });
 

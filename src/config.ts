@@ -6,7 +6,6 @@ import type { Logger } from "./logger.js";
 import {
   ServerConfigSchema,
   type MCPServer,
-  type ToolBridgeServer,
   type RawServerConfig,
 } from "./schemas/config.js";
 
@@ -16,11 +15,10 @@ export type {
   MCPServer,
   ApprovalRule,
   ReasoningEffort,
-  ToolBridgeServer,
 } from "./schemas/config.js";
 
 export type ServerConfig = Omit<RawServerConfig, "bodyLimitMiB" | "openai" | "anthropic"> & {
-  toolBridge: ToolBridgeServer;
+  toolBridge: boolean | null;
   mcpServers: Record<string, MCPServer>;
   bodyLimit: number;
 };
@@ -53,21 +51,6 @@ function resolveServerPaths(
         : server,
     ]),
   );
-}
-
-function resolveBridgePaths(
-  server: ToolBridgeServer | undefined,
-  configDir: string,
-): ToolBridgeServer {
-  if (!server) return null;
-  return {
-    ...server,
-    args: server.args.map((arg) =>
-      arg.startsWith("./") || arg.startsWith("../")
-        ? resolve(configDir, arg)
-        : arg,
-    ),
-  };
 }
 
 export type ProxyName = "openai" | "anthropic";
@@ -123,7 +106,7 @@ export async function loadConfig(
     autoApprovePermissions: parsed.autoApprovePermissions,
     reasoningEffort: parsed.reasoningEffort,
     bodyLimit: parsed.bodyLimitMiB * 1024 * 1024,
-    toolBridge: resolveBridgePaths(provider.toolBridge, configDir),
+    toolBridge: provider.toolBridge ?? null,
     mcpServers: resolveServerPaths(provider.mcpServers, configDir),
   };
 

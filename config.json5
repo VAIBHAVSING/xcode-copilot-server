@@ -31,10 +31,7 @@
     // so Claude Agent can drive tool execution through the IDE instead.
     // MCP_SERVER_PORT is injected automatically at runtime.
     // Set to null or remove to disable the tool bridge.
-    toolBridge: {
-      command: "node",
-      args: ["./scripts/mcp-tool-bridge.mjs"],
-    },
+    toolBridge: true,
 
     // No MCP servers needed, because Claude Agent handles tools natively.
     mcpServers: {},

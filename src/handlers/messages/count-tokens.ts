@@ -7,8 +7,8 @@ import {
 } from "../../schemas/anthropic.js";
 import { sendAnthropicError } from "../errors.js";
 
-// Flattens everything into a single string so we can run the token estimator
-// over the full request content.
+// The token estimator needs a single string, so we pull all text out of
+// the structured request.
 function extractAllText(req: AnthropicMessagesRequest): string {
   const parts: string[] = [];
 

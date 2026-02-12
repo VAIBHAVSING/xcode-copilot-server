@@ -135,23 +135,17 @@ describe("loadConfig", () => {
     expect(config.bodyLimit).toBe(10 * 1024 * 1024);
   });
 
-  it("loads toolBridge with relative path resolution", async () => {
+  it("loads toolBridge as boolean", async () => {
     const path = writeConfig(
       "bridge.json5",
       `{
         anthropic: {
-          toolBridge: {
-            command: "node",
-            args: ["./scripts/mcp-tool-bridge.mjs"],
-          },
+          toolBridge: true,
         },
       }`,
     );
     const config = await loadConfig(path, logger, "anthropic");
-    expect(config.toolBridge).toEqual({
-      command: "node",
-      args: [join(tempDir, "scripts/mcp-tool-bridge.mjs")],
-    });
+    expect(config.toolBridge).toBe(true);
   });
 
   it("defaults toolBridge to null when absent", async () => {
@@ -180,7 +174,7 @@ describe("loadConfig", () => {
           },
         },
         anthropic: {
-          toolBridge: { command: "node", args: ["/bridge.mjs"] },
+          toolBridge: true,
           mcpServers: {},
         },
       }`,
@@ -190,7 +184,7 @@ describe("loadConfig", () => {
     expect(Object.keys(openai.mcpServers)).toEqual(["xcode"]);
 
     const anthropic = await loadConfig(path, logger, "anthropic");
-    expect(anthropic.toolBridge).toEqual({ command: "node", args: ["/bridge.mjs"] });
+    expect(anthropic.toolBridge).toBe(true);
     expect(anthropic.mcpServers).toEqual({});
   });
 });
@@ -260,10 +254,10 @@ describe("config validation", () => {
     await expect(loadConfig(path, logger, "openai")).rejects.toThrow(/url/i);
   });
 
-  it("rejects invalid toolBridge (missing command)", async () => {
+  it("rejects invalid toolBridge (non-boolean)", async () => {
     const path = writeConfig(
       "bad.json5",
-      `{ anthropic: { toolBridge: { args: [] } } }`,
+      `{ anthropic: { toolBridge: "yes" } }`,
     );
     await expect(loadConfig(path, logger, "anthropic")).rejects.toThrow(/Invalid/i);
   });

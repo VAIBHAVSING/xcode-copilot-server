@@ -1,5 +1,5 @@
 import type { SessionConfig } from "@github/copilot-sdk";
-import type { ServerConfig, ApprovalRule, ToolBridgeServer } from "../config.js";
+import type { ServerConfig, ApprovalRule } from "../config.js";
 import type { Logger } from "../logger.js";
 
 export interface SessionConfigOptions {
@@ -9,7 +9,7 @@ export interface SessionConfigOptions {
   config: ServerConfig;
   supportsReasoningEffort: boolean;
   cwd?: string | undefined;
-  toolBridgeServer?: ToolBridgeServer | null | undefined;
+  hasToolBridge?: boolean;
   port?: number | undefined;
   conversationId?: string | undefined;
 }
@@ -26,11 +26,11 @@ export function createSessionConfig({
   config,
   supportsReasoningEffort,
   cwd,
-  toolBridgeServer,
+  hasToolBridge,
   port,
   conversationId,
 }: SessionConfigOptions): SessionConfig {
-  const hasBridge = !!toolBridgeServer;
+  const hasBridge = !!hasToolBridge;
 
   return {
     model,
@@ -52,19 +52,10 @@ export function createSessionConfig({
           { ...server, tools: ["*"] },
         ]),
       ),
-      ...(toolBridgeServer && {
+      ...(hasBridge && {
         "xcode-bridge": {
-          type: "local" as const,
-          command: toolBridgeServer.command,
-          args: [
-            ...toolBridgeServer.args,
-            `--port=${String(port ?? 8080)}`,
-            `--conv-id=${conversationId ?? ""}`,
-          ],
-          env: {
-            MCP_SERVER_PORT: String(port ?? 8080),
-            MCP_CONVERSATION_ID: conversationId ?? "",
-          },
+          type: "http" as const,
+          url: `http://127.0.0.1:${String(port ?? 8080)}/mcp/${conversationId ?? ""}`,
           tools: ["*"],
         },
       }),

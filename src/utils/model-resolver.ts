@@ -5,8 +5,8 @@ function normalize(id: string): string {
   return id.replace(/-\d{8}$/, "").replace(/\./g, "-");
 }
 
-// Grabs everything before the first digit so we can group models by family,
-// e.g. "claude-sonnet-4-5" (already normalized) becomes "claude-sonnet-".
+// We need to group models by family for fallback matching, so we grab the
+// prefix before the first digit (e.g. "claude-sonnet-4-5" → "claude-sonnet-").
 function extractFamily(id: string): string {
   const match = id.match(/^(.*?-)\d/);
   return match?.[1] ?? id;

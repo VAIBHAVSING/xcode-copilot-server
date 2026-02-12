@@ -31,10 +31,7 @@ const VALID_REASONING_EFFORTS = ["low", "medium", "high", "xhigh"] as const;
 
 const ReasoningEffortSchema = z.enum(VALID_REASONING_EFFORTS);
 
-const ToolBridgeServerSchema = z.object({
-  command: z.string().min(1, "Tool bridge server command cannot be empty"),
-  args: z.array(z.string()),
-}).nullable();
+const ToolBridgeServerSchema = z.boolean().nullable();
 
 export type MCPLocalServer = z.infer<typeof MCPLocalServerSchema>;
 export type MCPRemoteServer = z.infer<typeof MCPRemoteServerSchema>;

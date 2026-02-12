@@ -9,8 +9,9 @@ export const anthropicProvider = {
 
   register(app, ctx) {
     app.addHook("onRequest", (request, reply, done) => {
-      // Internal routes are called by the MCP tool bridge script (no UA)
-      if (request.url.startsWith("/internal/")) {
+      // MCP routes come from the SDK's own HTTP client, not from Xcode,
+      // so they won't have the claude-cli/ user-agent
+      if (request.url.startsWith("/mcp/")) {
         done();
         return;
       }
