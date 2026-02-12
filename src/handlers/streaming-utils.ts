@@ -12,7 +12,13 @@ export function sendSSEEvent(reply: FastifyReply, type: string, data: unknown): 
 }
 
 export function formatCompaction(data: unknown): string {
-  if (!data || typeof data !== "object") return "compaction data unavailable";
-  const cd = data as Record<string, unknown>;
-  return `${String(cd["preCompactionTokens"])} to ${String(cd["postCompactionTokens"])} tokens`;
+  if (
+    !data ||
+    typeof data !== "object" ||
+    !("preCompactionTokens" in data) ||
+    !("postCompactionTokens" in data)
+  ) {
+    return "compaction data unavailable";
+  }
+  return `${String(data.preCompactionTokens)} to ${String(data.postCompactionTokens)} tokens`;
 }
