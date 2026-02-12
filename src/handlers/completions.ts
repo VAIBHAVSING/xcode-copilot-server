@@ -82,6 +82,8 @@ export function createCompletionsHandler({ service, logger, config }: AppContext
         }
       }
 
+      // No resolveModel() needed here because Xcode picks from the
+      // /v1/models response which already has Copilot's exact IDs
       const sessionConfig = createSessionConfig({
         model: req.model,
         systemMessage,
