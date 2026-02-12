@@ -11,8 +11,6 @@ export class ToolBridgeState {
   readonly replyTracker = new ReplyTracker();
   readonly session = new SessionLifecycle(this.toolRouter);
 
-  // -- ToolCache delegation --
-
   cacheTools(tools: AnthropicToolDefinition[]): void {
     this.toolCache.cacheTools(tools);
   }
@@ -28,8 +26,6 @@ export class ToolBridgeState {
   normalizeArgs(toolName: string, args: Record<string, unknown>): Record<string, unknown> {
     return this.toolCache.normalizeArgs(toolName, args);
   }
-
-  // -- ToolRouter delegation --
 
   hasPendingToolCall(toolCallId: string): boolean {
     return this.toolRouter.hasPendingToolCall(toolCallId);
@@ -59,8 +55,6 @@ export class ToolBridgeState {
     return this.toolRouter.hasPending;
   }
 
-  // -- ReplyTracker delegation --
-
   get currentReply(): FastifyReply | null {
     return this.replyTracker.currentReply;
   }
@@ -80,8 +74,6 @@ export class ToolBridgeState {
   waitForStreamingDone(): Promise<void> {
     return this.replyTracker.waitForStreamingDone();
   }
-
-  // -- SessionLifecycle delegation --
 
   get sessionActive(): boolean {
     return this.session.sessionActive;

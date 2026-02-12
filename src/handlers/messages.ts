@@ -33,7 +33,6 @@ export function createMessagesHandler(
     }
     const req = parseResult.data;
 
-    // --- Continuation routing ---
     const existingConv = manager.findByContinuation(req.messages);
 
     if (existingConv) {
@@ -59,7 +58,6 @@ export function createMessagesHandler(
       return;
     }
 
-    // --- New request or reuse primary ---
     const { conversation, isReuse } = manager.findForNewRequest();
     const state = conversation.state;
     state.markSessionActive();

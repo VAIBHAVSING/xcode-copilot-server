@@ -50,7 +50,7 @@ export class ToolCache {
   }
 
   // The Copilot model doesn't always respect the exact property names or
-  // enum values in tool schemas — e.g. "ignoreCase" instead of "-i",
+  // enum values in tool schemas, e.g. "ignoreCase" instead of "-i",
   // "outputMode" instead of "output_mode", "filesWithMatches" instead of
   // "files_with_matches". We remap these against the actual schema so the
   // downstream executor doesn't reject them with InputValidationError.
@@ -92,7 +92,7 @@ export class ToolCache {
     if (typeof value !== "string" || !schemaProp?.enum) return value;
     if (schemaProp.enum.includes(value)) return value;
 
-    // e.g. "filesWithMatches" → "files_with_matches"
+    // e.g. "filesWithMatches" becomes "files_with_matches"
     const snake = camelToSnake(value);
     if (schemaProp.enum.includes(snake)) return snake;
 
