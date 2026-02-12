@@ -4,7 +4,9 @@ import type { Provider } from "./types.js";
 
 export type { Provider };
 
-export const providers: Record<string, Provider> = {
+export const providers = {
   openai: openaiProvider,
   anthropic: anthropicProvider,
-};
+} satisfies Record<string, Provider>;
+
+export type ProxyName = keyof typeof providers;

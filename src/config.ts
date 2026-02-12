@@ -53,7 +53,8 @@ function resolveServerPaths(
   );
 }
 
-export type ProxyName = "openai" | "anthropic";
+import type { ProxyName } from "./providers/index.js";
+export type { ProxyName };
 
 export async function loadConfig(
   configPath: string,

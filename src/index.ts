@@ -5,7 +5,7 @@ import { CopilotService } from "./copilot-service.js";
 import { loadConfig } from "./config.js";
 import { createServer } from "./server.js";
 import { Logger, LEVEL_PRIORITY, type LogLevel } from "./logger.js";
-import { providers } from "./providers/index.js";
+import { providers, type ProxyName } from "./providers/index.js";
 import type { AppContext } from "./context.js";
 
 const PACKAGE_ROOT = dirname(import.meta.dirname);
@@ -16,6 +16,10 @@ const VALID_PROXIES = Object.keys(providers);
 
 function isLogLevel(value: string): value is LogLevel {
   return value in LEVEL_PRIORITY;
+}
+
+function isProxy(value: string): value is ProxyName {
+  return value in providers;
 }
 
 const USAGE = `Usage: xcode-copilot-server [options]
@@ -63,14 +67,14 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const proxy = values.proxy as "openai" | "anthropic";
-  const provider = providers[proxy];
-  if (!provider) {
+  const proxy = values.proxy;
+  if (!isProxy(proxy)) {
     console.error(
       `Invalid proxy "${proxy}". Valid: ${VALID_PROXIES.join(", ")}`,
     );
     process.exit(1);
   }
+  const provider = providers[proxy];
 
   const rawLevel = values["log-level"];
   if (!isLogLevel(rawLevel)) {
