@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { loadConfig } from "../src/config.js";
+import { loadConfig, resolveConfigPath } from "../src/config.js";
 import { Logger } from "../src/logger.js";
 
 const logger = new Logger("none");
@@ -261,5 +261,18 @@ describe("config validation", () => {
     expect(config.allowedCliTools).toEqual([]);
     expect(config.bodyLimit).toBe(10 * 1024 * 1024);
     expect(config.autoApprovePermissions).toEqual(["read", "mcp"]);
+  });
+});
+
+describe("resolveConfigPath", () => {
+  it("returns cwd config when config.json5 exists there", () => {
+    writeFileSync(join(tempDir, "config.json5"), "{}");
+    const result = resolveConfigPath(tempDir, "/fallback/config.json5");
+    expect(result).toBe(join(tempDir, "config.json5"));
+  });
+
+  it("returns default path when cwd has no config.json5", () => {
+    const result = resolveConfigPath(tempDir, "/fallback/config.json5");
+    expect(result).toBe("/fallback/config.json5");
   });
 });
