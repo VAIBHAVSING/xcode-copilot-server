@@ -21,7 +21,7 @@ afterAll(async () => {
   await app.close();
 });
 
-function jsonRpc(method: string, id?: number | string, params?: unknown) {
+function jsonRpc(method: string, id?: number | string, params?: Record<string, unknown>) {
   return { jsonrpc: "2.0", method, ...(id !== undefined && { id }), ...(params && { params }) } as Record<string, unknown>;
 }
 
