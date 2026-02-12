@@ -9,12 +9,6 @@ export const LEVEL_PRIORITY = {
 
 export type LogLevel = keyof typeof LEVEL_PRIORITY;
 
-export function formatCompaction(data: unknown): string {
-  if (!data || typeof data !== "object") return "compaction data unavailable";
-  const cd = data as Record<string, unknown>;
-  return `${String(cd["preCompactionTokens"])} to ${String(cd["postCompactionTokens"])} tokens`;
-}
-
 export class Logger {
   readonly level: LogLevel;
   private threshold: number;
@@ -26,25 +20,25 @@ export class Logger {
 
   error(msg: string, ...args: unknown[]): void {
     if (this.threshold >= LEVEL_PRIORITY.error) {
-      console.error(`[ERROR] ${msg}`, ...args);
+      console.error(`[${new Date().toISOString()}] [ERROR] ${msg}`, ...args);
     }
   }
 
   warn(msg: string, ...args: unknown[]): void {
     if (this.threshold >= LEVEL_PRIORITY.warning) {
-      console.warn(`[WARN] ${msg}`, ...args);
+      console.warn(`[${new Date().toISOString()}] [WARN] ${msg}`, ...args);
     }
   }
 
   info(msg: string, ...args: unknown[]): void {
     if (this.threshold >= LEVEL_PRIORITY.info) {
-      console.log(`[INFO] ${msg}`, ...args);
+      console.log(`[${new Date().toISOString()}] [INFO] ${msg}`, ...args);
     }
   }
 
   debug(msg: string, ...args: unknown[]): void {
     if (this.threshold >= LEVEL_PRIORITY.debug) {
-      console.log(`[DEBUG] ${msg}`, ...args);
+      console.log(`[${new Date().toISOString()}] [DEBUG] ${msg}`, ...args);
     }
   }
 }

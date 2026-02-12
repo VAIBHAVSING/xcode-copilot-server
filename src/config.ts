@@ -17,17 +17,20 @@ export type {
   ReasoningEffort,
 } from "./schemas/config.js";
 
-export type ServerConfig = Omit<RawServerConfig, "bodyLimitMiB"> & {
+export type ServerConfig = Omit<RawServerConfig, "bodyLimitMiB" | "openai" | "anthropic"> & {
+  toolBridge: boolean;
+  mcpServers: Record<string, MCPServer>;
   bodyLimit: number;
 };
 
-const DEFAULT_CONFIG: ServerConfig = {
+const DEFAULT_CONFIG = {
+  toolBridge: false,
   mcpServers: {},
   allowedCliTools: [],
   excludedFilePatterns: [],
-  bodyLimit: 4 * 1024 * 1024, // 4 MiB
+  bodyLimit: 10 * 1024 * 1024, // 10 MiB
   autoApprovePermissions: ["read", "mcp"],
-};
+} satisfies ServerConfig;
 
 function resolveServerPaths(
   servers: Record<string, MCPServer>,
@@ -50,9 +53,13 @@ function resolveServerPaths(
   );
 }
 
+import type { ProxyName } from "./providers/index.js";
+export type { ProxyName };
+
 export async function loadConfig(
   configPath: string,
   logger: Logger,
+  proxy: ProxyName,
 ): Promise<ServerConfig> {
   const absolutePath = isAbsolute(configPath)
     ? configPath
@@ -91,14 +98,17 @@ export async function loadConfig(
     );
   }
 
-  const { bodyLimitMiB, ...rest } = parseResult.data;
+  const configDir = dirname(absolutePath);
+  const parsed = parseResult.data;
+  const provider = parsed[proxy];
   const config: ServerConfig = {
-    ...rest,
-    bodyLimit: bodyLimitMiB * 1024 * 1024,
-    mcpServers: resolveServerPaths(
-      parseResult.data.mcpServers,
-      dirname(absolutePath),
-    ),
+    allowedCliTools: parsed.allowedCliTools,
+    excludedFilePatterns: parsed.excludedFilePatterns,
+    autoApprovePermissions: parsed.autoApprovePermissions,
+    reasoningEffort: parsed.reasoningEffort,
+    bodyLimit: parsed.bodyLimitMiB * 1024 * 1024,
+    toolBridge: provider.toolBridge,
+    mcpServers: resolveServerPaths(provider.mcpServers, configDir),
   };
 
   const cliToolsSummary = config.allowedCliTools.includes("*")

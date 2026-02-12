@@ -1,60 +1,68 @@
 // Server configuration for xcode-copilot-server.
 // Edit this file to add MCP servers, control tool access, and set permissions.
 //
-// Note: The Tool permissions are checked across all allowlists. If the same tool name
-// exists in both CLI and MCP tools, then they cannot have different permissions.
+// Tool permissions are checked across all allowlists, so if the same tool name
+// exists in both CLI and MCP tools then they can't have different permissions.
 
 {
-  // MCP servers to register with the Copilot CLI session.
-  // Each key is a server name, where the value follows the Copilot SDK MCPServerConfig shape.
-  // Relative paths in "args" are resolved relative to this file's directory.
-  mcpServers: {
-    xcode: {
-      type: "local",
-      command: "node",
-      args: ["./scripts/mcpbridge-proxy.mjs"],
-      allowedTools: ["*"],
+  // Provider-specific settings. The active --proxy flag determines which
+  // section is used at runtime.
+
+  openai: {
+    // No tool bridge needed for OpenAI because Xcode drives tool execution
+    // directly. TODO: will need this for Codex Agent support.
+    toolBridge: false,
+
+    mcpServers: {
+      // Proxies Apple's xcrun mcpbridge (Xcode 26.3+). The script exits
+      // gracefully if mcpbridge isn't installed, so safe to leave enabled.
+      xcode: {
+        type: "local",
+        command: "node",
+        args: ["./scripts/mcpbridge-proxy.mjs"],
+        allowedTools: ["*"],
+      },
     },
-    // Example: add another MCP server
-    // myServer: {
-    //   type: "local",
-    //   command: "my-mcp-binary",
-    //   args: ["--some-flag"],
-    //   allowedTools: ["*"],
-    // },
   },
 
-  // Built-in CLI tools allowlist (glob, grep, bash, etc).
-  // - ["*"]: allow all CLI tools
-  // - []: deny all CLI tools
-  // - ["glob", "grep"]: allow only specific CLI tools
+  anthropic: {
+    // Normally the Copilot CLI executes tool calls (file reads, edits, etc.)
+    // on its own. This shim intercepts those calls and forwards them to Xcode
+    // so Claude Agent can drive tool execution through the IDE instead.
+    // Set to false or remove to disable the tool bridge.
+    toolBridge: true,
+
+    // No MCP servers needed, because Claude Agent handles tools natively.
+    mcpServers: {},
+  },
+
+  // Built-in Copilot CLI tools allowlist (glob, grep, bash, etc). Use ["*"] to allow
+  // all, [] to deny all, or list specific tools like ["glob", "grep"].
   //
-  // This is empty by default because Xcode should be the one handling operations
-  // like searching, reading, and editing files. The model tells Xcode what to
-  // change and Xcode applies those changes through its own UI, keeping everything
-  // in sync. If CLI tools are enabled, the Copilot session may perform those
-  // operations itself (e.g. writing files via bash), bypassing Xcode and leaving
-  // its UI out of sync with what actually happened on disk.
+  // This is empty by default because Xcode should be the one handling
+  // operations like searching, reading, and editing files. The model tells
+  // Xcode what to change and Xcode applies those changes through its own UI,
+  // keeping everything in sync. If CLI tools are enabled, the Copilot session
+  // may perform those operations itself (e.g. writing files via bash),
+  // bypassing Xcode and potentially leaving its UI out of sync with what actually
+  // happened on disk.
   allowedCliTools: [],
 
   // Maximum request body size in MiB.
-  bodyLimitMiB: 4,
+  bodyLimitMiB: 10,
 
-  // Filename patterns to filter out from search results in the prompt.
-  // Code blocks whose filename contains any of these (case-insensitive) are stripped.
-  //
-  // Xcode's search results can include full file contents for every match, which can
-  // bloat the prompt with irrelevant code. Add patterns here to strip those files
-  // before they reach the model (e.g. ["mock", "generated"]).
+  // Filename patterns to filter out from search results in the prompt. Xcode's
+  // search results can include full file contents for every match, which can
+  // bloat the prompt with irrelevant code. Add patterns here to strip those
+  // files before they reach the model, e.g. ["mock", "generated"].
   excludedFilePatterns: [],
 
-  // Reasoning effort for models that support it.
-  // E.g: "low", "medium", "high", "xhigh"
+  // Reasoning effort for models that support it, e.g. "low", "medium", "high",
+  // "xhigh".
   reasoningEffort: "xhigh",
 
-  // Auto-approve permission requests.
-  // - true: approve all
-  // - false: deny all
-  // - ["read", "mcp"]: approve only listed kinds (e.g: "read", "write", "shell", "mcp", "url")
+  // Auto-approve permission requests. Set to true to approve all, false to deny
+  // all, or pass an array of specific kinds to approve, e.g.
+  // ["read", "write", "shell", "mcp", "url"].
   autoApprovePermissions: ["read", "mcp"],
 }

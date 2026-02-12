@@ -31,14 +31,25 @@ const VALID_REASONING_EFFORTS = ["low", "medium", "high", "xhigh"] as const;
 
 const ReasoningEffortSchema = z.enum(VALID_REASONING_EFFORTS);
 
+const ToolBridgeServerSchema = z.boolean();
+
 export type MCPLocalServer = z.infer<typeof MCPLocalServerSchema>;
 export type MCPRemoteServer = z.infer<typeof MCPRemoteServerSchema>;
 export type MCPServer = z.infer<typeof MCPServerSchema>;
 export type ApprovalRule = z.infer<typeof ApprovalRuleSchema>;
 export type ReasoningEffort = z.infer<typeof ReasoningEffortSchema>;
+export type ToolBridgeServer = z.infer<typeof ToolBridgeServerSchema>;
+
+const ProviderConfigSchema = z.object({
+  toolBridge: ToolBridgeServerSchema.optional().default(false),
+  mcpServers: z.record(z.string(), MCPServerSchema).default({}),
+});
+
+export type ProviderConfig = z.infer<typeof ProviderConfigSchema>;
 
 export const ServerConfigSchema = z.object({
-  mcpServers: z.record(z.string(), MCPServerSchema).default({}),
+  openai: ProviderConfigSchema.default({ toolBridge: false, mcpServers: {} }),
+  anthropic: ProviderConfigSchema.default({ toolBridge: false, mcpServers: {} }),
   allowedCliTools: z.array(z.string()).refine(
     (arr) => !arr.includes("*") || arr.length === 1,
     'allowedCliTools: use ["*"] alone to allow all tools, don\'t mix with other entries',
@@ -48,7 +59,7 @@ export const ServerConfigSchema = z.object({
     .number()
     .positive()
     .max(100, "bodyLimitMiB cannot exceed 100")
-    .default(4),
+    .default(10),
   reasoningEffort: ReasoningEffortSchema.optional(),
   autoApprovePermissions: ApprovalRuleSchema.default(["read", "mcp"]),
 });

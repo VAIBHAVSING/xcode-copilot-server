@@ -1,6 +1,6 @@
-import type { SessionConfig, MCPServerConfig } from "@github/copilot-sdk";
-import type { ServerConfig, ApprovalRule } from "../../config.js";
-import type { Logger } from "../../logger.js";
+import type { SessionConfig } from "@github/copilot-sdk";
+import type { ServerConfig, ApprovalRule } from "../config.js";
+import type { Logger } from "../logger.js";
 
 export interface SessionConfigOptions {
   model: string;
@@ -9,6 +9,9 @@ export interface SessionConfigOptions {
   config: ServerConfig;
   supportsReasoningEffort: boolean;
   cwd?: string | undefined;
+  hasToolBridge?: boolean;
+  port?: number | undefined;
+  conversationId?: string | undefined;
 }
 
 function isApproved(rule: ApprovalRule, kind: string): boolean {
@@ -23,7 +26,12 @@ export function createSessionConfig({
   config,
   supportsReasoningEffort,
   cwd,
+  hasToolBridge,
+  port,
+  conversationId,
 }: SessionConfigOptions): SessionConfig {
+  const hasBridge = !!hasToolBridge;
+
   return {
     model,
     streaming: true,
@@ -37,14 +45,26 @@ export function createSessionConfig({
       },
     }),
 
-    mcpServers: Object.fromEntries(
-      Object.entries(config.mcpServers).map(([name, server]) => [
-        name,
-        { ...server, tools: ["*"] } as MCPServerConfig,
-      ]),
-    ),
+    mcpServers: {
+      ...Object.fromEntries(
+        Object.entries(config.mcpServers).map(([name, server]) => [
+          name,
+          { ...server, tools: ["*"] },
+        ]),
+      ),
+      ...(hasBridge && {
+        "xcode-bridge": {
+          type: "http" as const,
+          url: `http://127.0.0.1:${String(port ?? 8080)}/mcp/${conversationId ?? ""}`,
+          tools: ["*"],
+        },
+      }),
+    },
 
-    ...(config.allowedCliTools.length > 0 && {
+    // When the tool bridge is active, don't restrict availableTools so the CLI
+    // can expose the bridged tools to the model. The onPreToolUse hook handles
+    // permissions instead.
+    ...(!hasBridge && config.allowedCliTools.length > 0 && {
       availableTools: config.allowedCliTools,
     }),
     ...(config.reasoningEffort && supportsReasoningEffort && {
@@ -76,10 +96,12 @@ export function createSessionConfig({
       onPreToolUse: (input) => {
         const toolName = input.toolName;
 
-        if (
-          config.allowedCliTools.includes("*") ||
-          config.allowedCliTools.includes(toolName)
-        ) {
+        if (hasBridge && toolName.startsWith("xcode-bridge-")) {
+          logger.debug(`Tool "${toolName}": allowed (bridge)`);
+          return Promise.resolve({ permissionDecision: "allow" as const });
+        }
+
+        if (config.allowedCliTools.includes("*") || config.allowedCliTools.includes(toolName)) {
           logger.debug(`Tool "${toolName}": allowed (CLI)`);
           return Promise.resolve({ permissionDecision: "allow" as const });
         }
