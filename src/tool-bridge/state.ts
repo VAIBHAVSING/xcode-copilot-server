@@ -25,6 +25,10 @@ export class ToolBridgeState {
     return this.toolCache.resolveToolName(name);
   }
 
+  normalizeArgs(toolName: string, args: Record<string, unknown>): Record<string, unknown> {
+    return this.toolCache.normalizeArgs(toolName, args);
+  }
+
   // -- ToolRouter delegation --
 
   hasPendingToolCall(toolCallId: string): boolean {

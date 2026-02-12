@@ -192,11 +192,20 @@ export async function handleAnthropicStreaming(
             logger.debug(`Skipped ${String(skipped)} non-bridge tool request(s) (handled internally by CLI)`);
           }
 
-          // Xcode needs to see the names it originally sent
-          const stripped = bridgeRequests.map((tr) => ({
-            ...tr,
-            name: state.resolveToolName(stripMCPPrefix(tr.name)),
-          }));
+          // Xcode needs to see the names it originally sent, and the args
+          // need to match the schema because the Copilot model sometimes
+          // uses different naming conventions (e.g. "ignoreCase" vs "-i")
+          const stripped = bridgeRequests.map((tr) => {
+            const resolved = state.resolveToolName(stripMCPPrefix(tr.name));
+            return {
+              ...tr,
+              name: resolved,
+              arguments: state.normalizeArgs(
+                resolved,
+                (tr.arguments ?? {}) as Record<string, unknown>,
+              ),
+            };
+          });
 
           if (stripped.length > 0) {
             // register even without a reply because the model might have retried
