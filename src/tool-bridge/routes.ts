@@ -1,13 +1,14 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import { z } from "zod";
 import type { ConversationManager } from "../conversation-manager.js";
 import type { Logger } from "../logger.js";
 
-interface JsonRpcRequest {
-  jsonrpc: "2.0";
-  id?: number | string;
-  method: string;
-  params?: Record<string, unknown>;
-}
+const JsonRpcRequestSchema = z.object({
+  jsonrpc: z.literal("2.0"),
+  id: z.union([z.number(), z.string()]).optional(),
+  method: z.string(),
+  params: z.record(z.string(), z.unknown()).optional(),
+});
 
 function jsonRpcResult(id: number | string, result: unknown) {
   return { jsonrpc: "2.0" as const, id, result };
@@ -17,6 +18,7 @@ function jsonRpcError(id: number | string, code: number, message: string) {
   return { jsonrpc: "2.0" as const, id, error: { code, message } };
 }
 
+// Pinned to the version the Copilot SDK's MCP client actually speaks
 const PROTOCOL_VERSION = "2024-11-05";
 
 // Xcode tools arrive with names like "mcp__xcode-tools__XcodeRead" but
@@ -63,7 +65,11 @@ export function registerRoutes(
       reply: FastifyReply,
     ) => {
       const { convId } = request.params;
-      const msg = request.body as JsonRpcRequest;
+      const parsed = JsonRpcRequestSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.send(jsonRpcError(0, -32700, "Parse error"));
+      }
+      const msg = parsed.data;
 
       logger.debug(`MCP ${convId}: method="${msg.method}", id=${String(msg.id)}`);
 
@@ -106,9 +112,8 @@ export function registerRoutes(
             return reply.send(jsonRpcError(id, -32603, "Conversation not found"));
           }
 
-          const name = (params as { name?: string } | undefined)?.name;
-          const args = (params as { arguments?: Record<string, unknown> } | undefined)
-            ?.arguments ?? {};
+          const name = params?.["name"] as string | undefined;
+          const args = (params?.["arguments"] ?? {}) as Record<string, unknown>;
 
           if (!name) {
             return reply.send(jsonRpcError(id, -32602, "Missing tool name"));
