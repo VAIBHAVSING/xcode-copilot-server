@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from "vitest";
 import { createSpinner, printBanner, symbols, type BannerInfo } from "../src/ui.js";
 
 // eslint-disable-next-line no-control-regex
@@ -16,8 +16,8 @@ describe("symbols", () => {
 });
 
 describe("createSpinner", () => {
-  let writeSpy: ReturnType<typeof vi.spyOn<typeof process.stdout, "write">>;
-  let writeErrSpy: ReturnType<typeof vi.spyOn<typeof process.stderr, "write">>;
+  let writeSpy: MockInstance;
+  let writeErrSpy: MockInstance;
   let originalIsTTY: boolean | undefined;
 
   beforeEach(() => {
@@ -84,7 +84,7 @@ describe("createSpinner", () => {
       writeSpy.mockClear();
       spinner.succeed("All done!");
       const output = strip(
-        writeSpy.mock.calls.map((c) => String(c[0])).join(""),
+        writeSpy.mock.calls.map((c: unknown[]) => String(c[0])).join(""),
       );
       expect(output).toContain("✓");
       expect(output).toContain("All done!");
@@ -94,7 +94,7 @@ describe("createSpinner", () => {
       const spinner = createSpinner("Loading...");
       spinner.fail("Oops!");
       const output = strip(
-        writeErrSpy.mock.calls.map((c) => String(c[0])).join(""),
+        writeErrSpy.mock.calls.map((c: unknown[]) => String(c[0])).join(""),
       );
       expect(output).toContain("✗");
       expect(output).toContain("Oops!");
@@ -104,7 +104,7 @@ describe("createSpinner", () => {
       const spinner = createSpinner("Loading...");
       writeSpy.mockClear();
       spinner.stop();
-      const output = writeSpy.mock.calls.map((c) => strip(String(c[0]))).join("");
+      const output = writeSpy.mock.calls.map((c: unknown[]) => strip(String(c[0]))).join("");
       expect(output).not.toContain("✓");
       expect(output).not.toContain("✗");
     });
@@ -112,7 +112,7 @@ describe("createSpinner", () => {
 });
 
 describe("printBanner", () => {
-  let logSpy: ReturnType<typeof vi.spyOn<typeof console, "log">>;
+  let logSpy: MockInstance;
 
   beforeEach(() => {
     logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
@@ -133,7 +133,7 @@ describe("printBanner", () => {
 
   it("prints provider, routes, and directory", () => {
     printBanner(info);
-    const output = logSpy.mock.calls.map((c) => strip(String(c[0] ?? ""))).join("\n");
+    const output = logSpy.mock.calls.map((c: unknown[]) => strip(String(c[0]))).join("\n");
     expect(output).toContain("OpenAI");
     expect(output).toContain("--proxy openai");
     expect(output).toContain("GET /v1/models");
@@ -143,13 +143,13 @@ describe("printBanner", () => {
 
   it("does not show auto-patch when disabled", () => {
     printBanner(info);
-    const output = logSpy.mock.calls.map((c) => strip(String(c[0] ?? ""))).join("\n");
+    const output = logSpy.mock.calls.map((c: unknown[]) => strip(String(c[0]))).join("\n");
     expect(output).not.toContain("Auto-patch");
   });
 
   it("shows auto-patch when enabled", () => {
     printBanner({ ...info, autoPatch: true });
-    const output = logSpy.mock.calls.map((c) => strip(String(c[0] ?? ""))).join("\n");
+    const output = logSpy.mock.calls.map((c: unknown[]) => strip(String(c[0]))).join("\n");
     expect(output).toContain("Auto-patch");
     expect(output).toContain("enabled");
   });
