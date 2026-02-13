@@ -1,3 +1,5 @@
+import { bold, dim, red, yellow, cyan, symbols } from "./ui.js";
+
 export const LEVEL_PRIORITY = {
   none: 0,
   error: 1,
@@ -8,6 +10,13 @@ export const LEVEL_PRIORITY = {
 } as const satisfies Record<string, number>;
 
 export type LogLevel = keyof typeof LEVEL_PRIORITY;
+
+const LEVEL_STYLE = {
+  error: { label: red(bold("ERROR")), symbol: symbols.error },
+  warn: { label: yellow(bold("WARN")), symbol: symbols.warn },
+  info: { label: cyan("INFO"), symbol: symbols.info },
+  debug: { label: dim("DEBUG"), symbol: symbols.debug },
+} as const;
 
 export class Logger {
   readonly level: LogLevel;
@@ -20,25 +29,29 @@ export class Logger {
 
   error(msg: string, ...args: unknown[]): void {
     if (this.threshold >= LEVEL_PRIORITY.error) {
-      console.error(`[${new Date().toISOString()}] [ERROR] ${msg}`, ...args);
+      const { label, symbol } = LEVEL_STYLE.error;
+      console.error(`${dim(new Date().toISOString())} ${symbol} ${label} ${msg}`, ...args);
     }
   }
 
   warn(msg: string, ...args: unknown[]): void {
     if (this.threshold >= LEVEL_PRIORITY.warning) {
-      console.warn(`[${new Date().toISOString()}] [WARN] ${msg}`, ...args);
+      const { label, symbol } = LEVEL_STYLE.warn;
+      console.warn(`${dim(new Date().toISOString())} ${symbol} ${label} ${msg}`, ...args);
     }
   }
 
   info(msg: string, ...args: unknown[]): void {
     if (this.threshold >= LEVEL_PRIORITY.info) {
-      console.log(`[${new Date().toISOString()}] [INFO] ${msg}`, ...args);
+      const { label, symbol } = LEVEL_STYLE.info;
+      console.log(`${dim(new Date().toISOString())} ${symbol} ${label} ${msg}`, ...args);
     }
   }
 
   debug(msg: string, ...args: unknown[]): void {
     if (this.threshold >= LEVEL_PRIORITY.debug) {
-      console.log(`[${new Date().toISOString()}] [DEBUG] ${msg}`, ...args);
+      const { label, symbol } = LEVEL_STYLE.debug;
+      console.log(`${dim(new Date().toISOString())} ${symbol} ${label} ${dim(msg)}`, ...args);
     }
   }
 }

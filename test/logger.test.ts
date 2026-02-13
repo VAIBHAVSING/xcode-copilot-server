@@ -66,7 +66,7 @@ describe("Logger", () => {
     expect(logSpy).toHaveBeenCalledTimes(2);
   });
 
-  it("formats messages with timestamp and level prefix", () => {
+  it("formats messages with timestamp, symbol, and level prefix", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-02-11T12:30:45.123Z"));
 
@@ -77,8 +77,20 @@ describe("Logger", () => {
     logger.error("something broke");
     logger.info("all good");
 
-    expect(errorSpy).toHaveBeenCalledWith("[2026-02-11T12:30:45.123Z] [ERROR] something broke");
-    expect(logSpy).toHaveBeenCalledWith("[2026-02-11T12:30:45.123Z] [INFO] all good");
+    // eslint-disable-next-line no-control-regex
+    const strip = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, "");
+
+    const errorMsg = strip(String(errorSpy.mock.calls[0]?.[0] ?? ""));
+    expect(errorMsg).toContain("2026-02-11T12:30:45.123Z");
+    expect(errorMsg).toContain("✗");
+    expect(errorMsg).toContain("ERROR");
+    expect(errorMsg).toContain("something broke");
+
+    const infoMsg = strip(String(logSpy.mock.calls[0]?.[0] ?? ""));
+    expect(infoMsg).toContain("2026-02-11T12:30:45.123Z");
+    expect(infoMsg).toContain("●");
+    expect(infoMsg).toContain("INFO");
+    expect(infoMsg).toContain("all good");
 
     vi.useRealTimers();
   });
