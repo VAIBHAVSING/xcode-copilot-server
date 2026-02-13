@@ -35,6 +35,17 @@ describe("loadConfig", () => {
     expect(config.autoApprovePermissions).toEqual(["read", "mcp"]);
   });
 
+  it("re-throws non-ENOENT read errors", async () => {
+    const path = writeConfig("unreadable.json5", "{}");
+    const { chmodSync } = await import("node:fs");
+    chmodSync(path, 0o000);
+    try {
+      await expect(loadConfig(path, logger, "openai")).rejects.toThrow();
+    } finally {
+      chmodSync(path, 0o644);
+    }
+  });
+
   it("merges provided fields with defaults", async () => {
     const path = writeConfig(
       "config.json5",

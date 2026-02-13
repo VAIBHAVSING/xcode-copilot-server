@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { resolve, dirname, isAbsolute } from "node:path";
 import JSON5 from "json5";
 import type { Logger } from "./logger.js";
+import type { ProxyName } from "./providers/index.js";
 import {
   ServerConfigSchema,
   type MCPServer,
@@ -16,6 +17,7 @@ export type {
   ApprovalRule,
   ReasoningEffort,
 } from "./schemas/config.js";
+export type { ProxyName };
 
 export type ServerConfig = Omit<RawServerConfig, "bodyLimitMiB" | "openai" | "anthropic"> & {
   toolBridge: boolean;
@@ -53,9 +55,6 @@ function resolveServerPaths(
   );
 }
 
-import type { ProxyName } from "./providers/index.js";
-export type { ProxyName };
-
 export function resolveConfigPath(
   projectCwd: string | undefined,
   processCwd: string,
@@ -79,14 +78,17 @@ export async function loadConfig(
     ? configPath
     : resolve(process.cwd(), configPath);
 
-  if (!existsSync(absolutePath)) {
-    logger.warn(`No config file at ${absolutePath}, using defaults`);
-    return DEFAULT_CONFIG;
+  let text: string;
+  try {
+    text = await readFile(absolutePath, "utf-8");
+  } catch (err: unknown) {
+    if (err instanceof Error && "code" in err && (err as NodeJS.ErrnoException).code === "ENOENT") {
+      logger.warn(`No config file at ${absolutePath}, using defaults`);
+      return DEFAULT_CONFIG;
+    }
+    throw err;
   }
 
-  logger.info(`Reading config from ${absolutePath}`);
-
-  const text = await readFile(absolutePath, "utf-8");
   let raw: unknown;
   try {
     raw = JSON5.parse(text);
@@ -124,13 +126,6 @@ export async function loadConfig(
     toolBridge: provider.toolBridge,
     mcpServers: resolveServerPaths(provider.mcpServers, configDir),
   };
-
-  const cliToolsSummary = config.allowedCliTools.includes("*")
-    ? "all CLI tools allowed"
-    : `${String(config.allowedCliTools.length)} allowed CLI tool(s)`;
-  logger.info(
-    `Loaded ${String(Object.keys(config.mcpServers).length)} MCP server(s), ${cliToolsSummary}`,
-  );
 
   return config;
 }

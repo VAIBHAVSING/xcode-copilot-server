@@ -1,111 +1,49 @@
 #!/usr/bin/env node
 import { join, dirname } from "node:path";
-import { parseArgs } from "node:util";
+import { readFile } from "node:fs/promises";
+import { z } from "zod";
+import { Command } from "commander";
 import { CopilotService } from "./copilot-service.js";
 import { loadConfig, resolveConfigPath } from "./config.js";
 import { createServer } from "./server.js";
-import { Logger, LEVEL_PRIORITY, type LogLevel } from "./logger.js";
-import { providers, type ProxyName } from "./providers/index.js";
+import { Logger } from "./logger.js";
+import { providers } from "./providers/index.js";
 import type { AppContext } from "./context.js";
 import { patchSettings, restoreSettings } from "./settings-patcher.js";
+import {
+  parsePort,
+  parseLogLevel,
+  parseProxy,
+  validateAutoPatch,
+} from "./cli-validators.js";
+import { bold, dim, createSpinner, printBanner } from "./ui.js";
 
 const PACKAGE_ROOT = dirname(import.meta.dirname);
 const DEFAULT_CONFIG_PATH = join(PACKAGE_ROOT, "config.json5");
 
-const VALID_LOG_LEVELS = Object.keys(LEVEL_PRIORITY) as LogLevel[];
-const VALID_PROXIES = Object.keys(providers);
-
-function isLogLevel(value: string): value is LogLevel {
-  return value in LEVEL_PRIORITY;
+interface StartOptions {
+  port: string;
+  proxy: string;
+  logLevel: string;
+  config?: string;
+  cwd?: string;
+  autoPatch?: true;
 }
 
-function isProxy(value: string): value is ProxyName {
-  return value in providers;
-}
-
-const USAGE = `Usage: xcode-copilot-server [options]
-
-Options:
-  --port <number>        Port to listen on (default: 8080)
-  --proxy <provider>     API format to expose: ${VALID_PROXIES.join(", ")} (default: openai)
-  --log-level <level>    Log verbosity: ${VALID_LOG_LEVELS.join(", ")} (default: info)
-  --config <path>        Path to config file (auto-detected from --cwd, then process cwd, else bundled)
-  --cwd <path>           Working directory for Copilot sessions (default: process cwd)
-  --auto-patch           Auto-patch settings.json on start, restore on exit (anthropic mode)
-  --patch-settings       Patch settings.json to point to this server, then exit
-  --restore-settings     Restore settings.json from backup, then exit
-  --help                 Show this help message`;
-
-function parseCliArgs() {
-  try {
-    return parseArgs({
-      options: {
-        port: { type: "string", default: "8080" },
-        proxy: { type: "string", default: "openai" },
-        "log-level": { type: "string", default: "info" },
-        config: { type: "string" },
-        cwd: { type: "string" },
-        "auto-patch": { type: "boolean", default: false },
-        "patch-settings": { type: "boolean", default: false },
-        "restore-settings": { type: "boolean", default: false },
-        help: { type: "boolean", default: false },
-      },
-      strict: true,
-      allowPositionals: false,
-    });
-  } catch (err) {
-    console.error(String(err instanceof Error ? err.message : err));
-    console.error(`Run with --help for usage information.`);
-    process.exit(1);
-  }
-}
-
-async function main(): Promise<void> {
-  const { values } = parseCliArgs();
-
-  if (values.help) {
-    console.log(USAGE);
-    process.exit(0);
-  }
-
-  const rawLevel = values["log-level"];
-  if (!isLogLevel(rawLevel)) {
-    console.error(
-      `Invalid log level "${rawLevel}". Valid: ${VALID_LOG_LEVELS.join(", ")}`,
-    );
-    process.exit(1);
-  }
-  const logLevel = rawLevel;
+async function startServer(options: StartOptions): Promise<void> {
+  const logLevel = parseLogLevel(options.logLevel);
   const logger = new Logger(logLevel);
+  const port = parsePort(options.port);
+  const proxy = parseProxy(options.proxy);
 
-  const port = parseInt(values.port, 10);
-  if (isNaN(port) || port < 1 || port > 65535) {
-    console.error(`Invalid port "${values.port}". Must be 1-65535.`);
-    process.exit(1);
-  }
+  const autoPatch = options.autoPatch === true;
+  validateAutoPatch(proxy, autoPatch);
 
-  if (values["patch-settings"]) {
-    await patchSettings({ port, logger });
-    process.exit(0);
-  }
-
-  if (values["restore-settings"]) {
-    await restoreSettings({ logger });
-    process.exit(0);
-  }
-
-  const proxy = values.proxy;
-  if (!isProxy(proxy)) {
-    console.error(
-      `Invalid proxy "${proxy}". Valid: ${VALID_PROXIES.join(", ")}`,
-    );
-    process.exit(1);
-  }
   const provider = providers[proxy];
 
-  const configPath = values.config ?? resolveConfigPath(values.cwd, process.cwd(), DEFAULT_CONFIG_PATH);
+  const configPath = options.config ?? resolveConfigPath(options.cwd, process.cwd(), DEFAULT_CONFIG_PATH);
   const config = await loadConfig(configPath, logger, proxy);
-  const cwd = values.cwd;
+  const cwd = options.cwd;
 
   const service = new CopilotService({
     logLevel,
@@ -113,33 +51,62 @@ async function main(): Promise<void> {
     cwd,
   });
 
-  logger.info("Booting up Copilot CLI...");
-  await service.start();
-  logger.info("Copilot CLI is up");
+  const quiet = logLevel === "none";
 
+  if (!quiet) {
+    console.log();
+    console.log(`  ${bold("xcode-copilot-server")} ${dim(`v${version}`)}`);
+    console.log();
+  }
+
+  const bootSpinner = quiet ? null : createSpinner("Starting Copilot SDK...");
+  await service.start();
+  bootSpinner?.succeed("Copilot SDK started");
+
+  const authSpinner = quiet ? null : createSpinner("Authenticating...");
   const auth = await service.getAuthStatus();
   if (!auth.isAuthenticated) {
+    authSpinner?.fail("Not authenticated");
     logger.error(
-      "Not authenticated. Sign in with the Copilot CLI (copilot login) or GitHub CLI (gh auth login), or set a GITHUB_TOKEN environment variable.",
+      "Sign in with the Copilot CLI (copilot login) or GitHub CLI (gh auth login), or set a GITHUB_TOKEN environment variable.",
     );
     await service.stop();
     process.exit(1);
   }
-  logger.info(`Authenticated as ${auth.login ?? "unknown"} (${auth.authType ?? "unknown"})`);
+  const login = auth.login ?? "unknown";
+  const authType = auth.authType ?? "unknown";
+  authSpinner?.succeed(`Authenticated as ${bold(login)} ${dim(`(${authType})`)}`);
 
-  const autoPatch = values["auto-patch"];
   if (autoPatch) {
     await patchSettings({ port, logger });
   }
 
   const ctx: AppContext = { service, logger, config, port };
   const app = await createServer(ctx, provider);
+  const listenSpinner = quiet ? null : createSpinner(`Starting server on port ${String(port)}...`);
+  const prevPinoLevel = app.log.level;
+  app.log.level = "silent";
   await app.listen({ port, host: "127.0.0.1" });
+  app.log.level = prevPinoLevel;
+  listenSpinner?.succeed(`Listening on ${bold(`http://localhost:${String(port)}`)}`);
 
-  logger.info(`Listening on http://localhost:${String(port)}`);
-  logger.info(`Provider: ${provider.name} (--proxy ${proxy})`);
-  logger.info(`Routes: ${provider.routes.join(", ")}`);
-  logger.info(`Current working directory: ${service.cwd}`);
+  if (!quiet) {
+    printBanner({
+      port,
+      proxy,
+      providerName: provider.name,
+      routes: provider.routes,
+      cwd: service.cwd,
+      autoPatch,
+    });
+  }
+
+  logger.debug(`Config loaded from ${configPath}`);
+  const mcpCount = Object.keys(config.mcpServers).length;
+  const cliToolsSummary = config.allowedCliTools.includes("*")
+    ? "all CLI tools allowed"
+    : `${String(config.allowedCliTools.length)} allowed CLI tool(s)`;
+  logger.debug(`${String(mcpCount)} MCP server(s), ${cliToolsSummary}`);
 
   const shutdown = async (signal: string) => {
     logger.info(`Got ${signal}, shutting down...`);
@@ -168,11 +135,73 @@ async function main(): Promise<void> {
     process.exit(0);
   };
 
-  process.on("SIGINT", () => void shutdown("SIGINT"));
-  process.on("SIGTERM", () => void shutdown("SIGTERM"));
+  const onSignal = (signal: string) => {
+    shutdown(signal).catch((err: unknown) => {
+      console.error("Shutdown error:", err);
+      process.exit(1);
+    });
+  };
+  process.on("SIGINT", () => { onSignal("SIGINT"); });
+  process.on("SIGTERM", () => { onSignal("SIGTERM"); });
 }
 
-main().catch((err: unknown) => {
+interface PatchOptions {
+  port: string;
+  logLevel: string;
+}
+
+async function patchSettingsCommand(options: PatchOptions): Promise<void> {
+  const logLevel = parseLogLevel(options.logLevel);
+  const logger = new Logger(logLevel);
+  const port = parsePort(options.port);
+
+  await patchSettings({ port, logger });
+}
+
+interface RestoreOptions {
+  logLevel: string;
+}
+
+async function restoreSettingsCommand(options: RestoreOptions): Promise<void> {
+  const logLevel = parseLogLevel(options.logLevel);
+  const logger = new Logger(logLevel);
+
+  await restoreSettings({ logger });
+}
+
+// Can't use JSON import because rootDir is src/ and package.json is at the project root.
+const { version } = z.object({ version: z.string() }).parse(
+  JSON.parse(await readFile(join(PACKAGE_ROOT, "package.json"), "utf-8")),
+);
+
+const program = new Command()
+  .name("xcode-copilot-server")
+  .description("Proxy API server for Xcode, powered by GitHub Copilot")
+  .version(version, "-v, --version");
+
+program
+  .option("-p, --port <number>", "port to listen on", "8080")
+  .option("--proxy <provider>", "API format: openai, anthropic", "openai")
+  .option("-l, --log-level <level>", "log verbosity", "info")
+  .option("-c, --config <path>", "path to config file")
+  .option("--cwd <path>", "working directory for Copilot sessions")
+  .option("--auto-patch", "auto-patch settings.json on start, restore on exit")
+  .action((options: StartOptions) => startServer(options));
+
+program
+  .command("patch-settings")
+  .description("Patch settings.json to point to this server, then exit")
+  .option("-p, --port <number>", "port to write into settings.json", "8080")
+  .option("-l, --log-level <level>", "log verbosity", "info")
+  .action((options: PatchOptions) => patchSettingsCommand(options));
+
+program
+  .command("restore-settings")
+  .description("Restore settings.json from backup, then exit")
+  .option("-l, --log-level <level>", "log verbosity", "info")
+  .action((options: RestoreOptions) => restoreSettingsCommand(options));
+
+program.parseAsync().catch((err: unknown) => {
   console.error("Fatal error:", err);
   process.exit(1);
 });
