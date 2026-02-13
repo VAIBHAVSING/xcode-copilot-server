@@ -17,6 +17,7 @@ import {
   patchCodexSettings,
   restoreCodexSettings,
   detectCodexPatchState,
+  patcherByProxy,
   type Settings,
   type SettingsPaths,
   type ExecFn,
@@ -53,6 +54,24 @@ function readSettings(): Settings {
 function readBackup(): Settings {
   return JSON.parse(readFileSync(paths.backup, "utf-8")) as Settings;
 }
+
+describe("patcherByProxy", () => {
+  it("has a patcher for claude", () => {
+    expect(patcherByProxy.claude).toBeDefined();
+    expect(patcherByProxy.claude!.patch).toBe(patchClaudeSettings);
+    expect(patcherByProxy.claude!.restore).toBe(restoreClaudeSettings);
+  });
+
+  it("has a patcher for codex", () => {
+    expect(patcherByProxy.codex).toBeDefined();
+    expect(patcherByProxy.codex!.patch).toBe(patchCodexSettings);
+    expect(patcherByProxy.codex!.restore).toBe(restoreCodexSettings);
+  });
+
+  it("has no patcher for openai", () => {
+    expect(patcherByProxy.openai).toBeUndefined();
+  });
+});
 
 describe("patchClaudeSettings", () => {
   it("creates settings.json when none exists (no backup)", async () => {

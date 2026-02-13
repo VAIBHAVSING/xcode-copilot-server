@@ -4,11 +4,8 @@ import { readFile } from "node:fs/promises";
 import { z } from "zod";
 import { Command } from "commander";
 import { Logger } from "./logger.js";
-import {
-  patchClaudeSettings,
-  restoreClaudeSettings,
-} from "./settings-patcher/index.js";
-import { parsePort, parseLogLevel } from "./cli-validators.js";
+import { patcherByProxy } from "./settings-patcher/index.js";
+import { parsePort, parseLogLevel, parseProxy } from "./cli-validators.js";
 import { startServer, type StartOptions } from "./startup.js";
 
 const PACKAGE_ROOT = dirname(import.meta.dirname);
@@ -21,6 +18,7 @@ const { version } = z.object({ version: z.string() }).parse(
 
 interface PatchOptions {
   port: string;
+  proxy: string;
   logLevel: string;
 }
 
@@ -28,19 +26,30 @@ async function patchSettingsCommand(options: PatchOptions): Promise<void> {
   const logLevel = parseLogLevel(options.logLevel);
   const logger = new Logger(logLevel);
   const port = parsePort(options.port);
+  const proxy = parseProxy(options.proxy);
 
-  await patchClaudeSettings({ port, logger });
+  const patcher = patcherByProxy[proxy];
+  if (!patcher) {
+    throw new Error(`No settings patcher for --proxy ${proxy}`);
+  }
+  await patcher.patch({ port, logger });
 }
 
 interface RestoreOptions {
+  proxy: string;
   logLevel: string;
 }
 
 async function restoreSettingsCommand(options: RestoreOptions): Promise<void> {
   const logLevel = parseLogLevel(options.logLevel);
   const logger = new Logger(logLevel);
+  const proxy = parseProxy(options.proxy);
 
-  await restoreClaudeSettings({ logger });
+  const patcher = patcherByProxy[proxy];
+  if (!patcher) {
+    throw new Error(`No settings patcher for --proxy ${proxy}`);
+  }
+  await patcher.restore({ logger });
 }
 
 const program = new Command()
@@ -59,14 +68,16 @@ program
 
 program
   .command("patch-settings")
-  .description("Patch settings.json to point to this server, then exit")
-  .option("-p, --port <number>", "port to write into settings.json", "8080")
+  .description("Patch settings to point to this server, then exit")
+  .option("-p, --port <number>", "port to write into settings", "8080")
+  .option("--proxy <provider>", "which provider to patch: claude, codex", "claude")
   .option("-l, --log-level <level>", "log verbosity", "info")
   .action((options: PatchOptions) => patchSettingsCommand(options));
 
 program
   .command("restore-settings")
-  .description("Restore settings.json from backup, then exit")
+  .description("Restore settings from backup, then exit")
+  .option("--proxy <provider>", "which provider to restore: claude, codex", "claude")
   .option("-l, --log-level <level>", "log verbosity", "info")
   .action((options: RestoreOptions) => restoreSettingsCommand(options));
 
