@@ -1,9 +1,14 @@
-node_modules/
-dist/
+# Proxy server
+proxy-server/node_modules/
+proxy-server/dist/
+proxy-server/coverage/
+proxy-server/*.tsbuildinfo
+
+# Menu bar app
+menu-bar-app/.build/
+
+# General
 .env
 .env.*
 .DS_Store
 .vscode/
-coverage/
-*.tsbuildinfo
-.build/
