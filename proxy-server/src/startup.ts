@@ -82,7 +82,7 @@ export async function startServer(options: StartOptions): Promise<void> {
 
   if (!quiet) {
     console.log();
-    console.log(`  ${bold("xcode-copilot-server")} ${dim(`v${options.version}`)}`);
+    console.log(`  ${bold("copilot-proxy")} ${dim(`v${options.version}`)}`);
     console.log();
   }
 

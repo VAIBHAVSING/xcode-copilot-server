@@ -36,7 +36,7 @@ afterAll(async () => {
   await app.close();
 });
 
-describe("Codex provider — user-agent check", () => {
+describe("Codex provider — generic client access", () => {
   it("allows Xcode/ user-agent", async () => {
     const res = await app.inject({
       method: "POST",
@@ -44,31 +44,30 @@ describe("Codex provider — user-agent check", () => {
       headers: codexHeaders,
       payload: { model: "gpt-4o", input: "Hello" },
     });
-    // should get past UA check (500 because no real service, not 403)
     expect(res.statusCode).not.toBe(403);
   });
 
-  it("rejects requests with non-allowed user-agent", async () => {
+  it("allows requests with non-Xcode user-agent", async () => {
     const res = await app.inject({
       method: "POST",
       url: "/v1/responses",
       headers: { "user-agent": "curl/8.0" },
       payload: { model: "gpt-4o", input: "Hello" },
     });
-    expect(res.statusCode).toBe(403);
+    expect(res.statusCode).not.toBe(403);
   });
 
-  it("rejects requests with no user-agent", async () => {
+  it("allows requests with no user-agent", async () => {
     const res = await app.inject({
       method: "POST",
       url: "/v1/responses",
       headers: {},
       payload: { model: "gpt-4o", input: "Hello" },
     });
-    expect(res.statusCode).toBe(403);
+    expect(res.statusCode).not.toBe(403);
   });
 
-  it("skips UA check for /mcp/ routes", async () => {
+  it("still allows /mcp/ routes", async () => {
     const res = await app.inject({
       method: "POST",
       url: "/mcp/test-conv",

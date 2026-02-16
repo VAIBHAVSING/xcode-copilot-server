@@ -1,17 +1,18 @@
 {
-  "name": "xcode-copilot-server",
+  "name": "copilot-proxy",
   "version": "3.0.0",
   "description": "OpenAI-compatible proxy API server for Xcode, powered by GitHub Copilot",
   "type": "module",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/theblixguy/xcode-copilot-server.git"
+    "url": "git+https://github.com/VAIBHAVSING/xcode-copilot-server.git"
   },
   "engines": {
     "node": "25.6.0"
   },
   "bin": {
+    "copilot-proxy": "dist/index.js",
     "xcode-copilot-server": "dist/index.js"
   },
   "files": [

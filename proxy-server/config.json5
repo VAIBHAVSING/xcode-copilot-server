@@ -1,4 +1,4 @@
-// Server configuration for xcode-copilot-server.
+// Server configuration for copilot-proxy.
 // Edit this file to add MCP servers, control tool access, and set permissions.
 //
 // Tool permissions are checked across all allowlists, so if the same tool name

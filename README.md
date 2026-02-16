@@ -1,6 +1,6 @@
-# xcode-copilot-server [![npm version](https://img.shields.io/npm/v/xcode-copilot-server)](https://www.npmjs.com/package/xcode-copilot-server)
+# copilot-proxy [![npm version](https://img.shields.io/npm/v/copilot-proxy)](https://www.npmjs.com/package/copilot-proxy)
 
-A proxy API server that lets you use GitHub Copilot in Xcode, either as a custom model provider or as the backend for Claude Agent and Codex Agent.
+A general-purpose proxy API server that lets you use GitHub Copilot in Xcode, either as a custom model provider or as the backend for Claude Agent and Codex Agent.
 
 ![Screenshot](assets/screenshot.png)
 
@@ -10,7 +10,7 @@ Xcode 26 added support for third-party LLM providers, but it only supports ChatG
 
 This server bridges the gap by wrapping the [GitHub Copilot SDK](https://github.com/github/copilot-sdk) and exposing it as an API that Xcode can talk to. It supports three providers:
 
-- **OpenAI** (default): Exposes an OpenAI-compatible completions API so Xcode can use Copilot as a custom model provider. Xcode handles tool execution directly.
+- **OpenAI** (default): Exposes an OpenAI-compatible completions API so Xcode can use Copilot as a custom model provider. `GET /v1/models` returns all models available from your Copilot account. Xcode handles tool execution directly.
 - **Claude**: Exposes an Anthropic-compatible API so Xcode can use Copilot as the backend for Claude Agent. A built-in tool bridge intercepts tool calls and routes them back to Xcode for execution.
 - **Codex**: Exposes an OpenAI Responses-compatible API so Xcode can use Copilot as the backend for Codex Agent. Same tool bridge as Claude.
 
@@ -27,19 +27,19 @@ You need [Node.js](https://nodejs.org) 25.6.0 or later and a GitHub Copilot subs
 Then install the server via:
 
 ```bash
-npm install -g xcode-copilot-server
+npm install -g copilot-proxy
 ```
 
 Or run it without installing globally:
 
 ```bash
-npx xcode-copilot-server
+npx copilot-proxy
 ```
 
 ## Usage
 
 ```bash
-xcode-copilot-server [options]
+copilot-proxy [options]
 
 Options:
   -p, --port <number>      Port to listen on (default: 8080)
@@ -68,7 +68,7 @@ The `--proxy` flag determines which API the server exposes:
 
 ### OpenAI (custom model provider)
 
-1. Start the server: `xcode-copilot-server`
+1. Start the server: `copilot-proxy`
 2. Open Xcode and go to Settings > Intelligence > Add a provider
 3. Select "Locally hosted" and set the port to 8080 (or the port that you've chosen)
 4. Give it a description e.g. "Copilot"
@@ -83,7 +83,7 @@ To enable tool calling, select the provider and enable "Allow tools" under "Adva
 3. Start the server with `--auto-patch` to automatically configure `settings.json`:
 
    ```bash
-   xcode-copilot-server --proxy claude --auto-patch
+   copilot-proxy --proxy claude --auto-patch
    ```
 
    This creates (or updates) `settings.json` at `~/Library/Developer/Xcode/CodingAssistant/ClaudeAgentConfig/` to point to the server, and restores the original file when the server shuts down. If `settings.json` already exists, a backup is saved as `settings.json.backup` and restored on exit.
@@ -102,14 +102,14 @@ To enable tool calling, select the provider and enable "Allow tools" under "Adva
    Set the port to match your `--port` flag (default 8080). The auth token can be any non-empty string. Then start the server without `--auto-patch`:
 
    ```bash
-   xcode-copilot-server --proxy claude
+   copilot-proxy --proxy claude
    ```
 
    You can also use the `patch-settings` and `restore-settings` subcommands to patch or restore settings without starting the server:
 
    ```bash
-   xcode-copilot-server patch-settings --proxy claude --port 8080
-   xcode-copilot-server restore-settings --proxy claude
+   copilot-proxy patch-settings --proxy claude --port 8080
+   copilot-proxy restore-settings --proxy claude
    ```
 
 The tool bridge is enabled by default for Claude (`toolBridge: true` in the config). It intercepts tool calls from the Copilot session and forwards them to Xcode, so Claude Agent can read files, search code, and make edits through the IDE.
@@ -121,7 +121,7 @@ The tool bridge is enabled by default for Claude (`toolBridge: true` in the conf
 3. Start the server with `--auto-patch` to automatically configure the environment:
 
    ```bash
-   xcode-copilot-server --proxy codex --auto-patch
+   copilot-proxy --proxy codex --auto-patch
    ```
 
    This sets `OPENAI_BASE_URL` and `OPENAI_API_KEY` via `launchctl setenv` so Xcode (and any Codex process it spawns) can reach the server. The original values are backed up and restored when the server shuts down. If Xcode was already running, you might need to restart it so it picks up the new environment variables.
@@ -136,7 +136,7 @@ The tool bridge is enabled by default for Claude (`toolBridge: true` in the conf
    Set the port to match your `--port` flag (default 8080). The API key can be any non-empty string. Then start the server without `--auto-patch`:
 
    ```bash
-   xcode-copilot-server --proxy codex
+   copilot-proxy --proxy codex
    ```
 
    To restore the original values when you're done:
@@ -149,8 +149,8 @@ The tool bridge is enabled by default for Claude (`toolBridge: true` in the conf
    You can also use the `patch-settings` and `restore-settings` subcommands to do this without starting the server:
 
    ```bash
-   xcode-copilot-server patch-settings --proxy codex --port 8080
-   xcode-copilot-server restore-settings --proxy codex
+   copilot-proxy patch-settings --proxy codex --port 8080
+   copilot-proxy restore-settings --proxy codex
    ```
 
 The tool bridge works the same way as Claude, as it intercepts tool calls and routes them back to Xcode for execution.
@@ -170,7 +170,7 @@ The tool bridge works the same way as Claude, as it intercepts tool calls and ro
 The server reads its configuration from a `config.json5` file. By default, it uses the bundled one, but you can point to your own with `--config`:
 
 ```bash
-xcode-copilot-server --config ./my-config.json5
+copilot-proxy --config ./my-config.json5
 ```
 
 The config file uses [JSON5](https://json5.org/) format, which supports comments and trailing commas. The `--proxy` flag determines which provider section (`openai`, `claude`, or `codex`) is used at runtime:
@@ -240,7 +240,7 @@ The config file uses [JSON5](https://json5.org/) format, which supports comments
 
 This server acts as a local proxy between Xcode and GitHub Copilot. It's designed to run on your machine and isn't intended to be exposed to the internet or shared networks. So, here's what you should know:
 
-- The server binds to `127.0.0.1`, so it's only reachable from your machine. Incoming requests are checked for expected user-agent headers (`Xcode/` for OpenAI and Codex, `claude-cli/` for Claude), which means casual or accidental connections from other tools will be rejected. This isn't a strong security boundary since user-agent headers can be trivially spoofed, but it helps ensure only the expected client is talking to the server.
+- The server binds to `127.0.0.1`, so it's only reachable from your machine. It's still a local proxy and isn't intended to be exposed to the internet or shared networks.
 
 - The bundled config sets `autoApprovePermissions` to `["read", "mcp"]`, which lets the Copilot session read files and call MCP tools without prompting. Writes, shell commands, and URL fetches are denied by default. You can set it to `true` to approve everything, `false` to deny everything, or pick specific kinds from `"read"`, `"write"`, `"shell"`, `"mcp"`, and `"url"`.
 

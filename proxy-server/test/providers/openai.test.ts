@@ -34,8 +34,8 @@ afterAll(async () => {
   await app.close();
 });
 
-describe("OpenAI provider — user-agent check", () => {
-  it("allows requests with Xcode user-agent past the hook", async () => {
+describe("OpenAI provider — generic client access", () => {
+  it("allows requests with Xcode user-agent", async () => {
     const res = await app.inject({
       method: "GET",
       url: "/v1/models",
@@ -44,24 +44,22 @@ describe("OpenAI provider — user-agent check", () => {
     expect(res.statusCode).not.toBe(403);
   });
 
-  it("rejects requests without user-agent", async () => {
+  it("allows requests without user-agent", async () => {
     const res = await app.inject({
       method: "GET",
       url: "/v1/models",
       headers: {},
     });
-    expect(res.statusCode).toBe(403);
-    expect(res.json()).toEqual({ error: "Forbidden" });
+    expect(res.statusCode).not.toBe(403);
   });
 
-  it("rejects requests with non-Xcode user-agent", async () => {
+  it("allows requests with non-Xcode user-agent", async () => {
     const res = await app.inject({
       method: "GET",
       url: "/v1/models",
       headers: { "user-agent": "curl/8.0" },
     });
-    expect(res.statusCode).toBe(403);
-    expect(res.json()).toEqual({ error: "Forbidden" });
+    expect(res.statusCode).not.toBe(403);
   });
 });
 

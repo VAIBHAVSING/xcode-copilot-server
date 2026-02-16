@@ -53,7 +53,7 @@ async function restoreSettingsCommand(options: RestoreOptions): Promise<void> {
 }
 
 const program = new Command()
-  .name("xcode-copilot-server")
+  .name("copilot-proxy")
   .description("Proxy API server for Xcode, powered by GitHub Copilot")
   .version(version, "-v, --version");
 

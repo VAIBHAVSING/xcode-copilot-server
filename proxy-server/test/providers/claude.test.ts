@@ -36,7 +36,7 @@ afterAll(async () => {
   await app.close();
 });
 
-describe("Anthropic provider — user-agent check", () => {
+describe("Anthropic provider — generic client access", () => {
   it("allows claude-cli/ user-agent", async () => {
     const res = await app.inject({
       method: "POST",
@@ -48,34 +48,33 @@ describe("Anthropic provider — user-agent check", () => {
     expect(res.statusCode).toBe(400);
   });
 
-  it("rejects requests with non-allowed user-agent", async () => {
+  it("allows requests with non-claude user-agent", async () => {
     const res = await app.inject({
       method: "POST",
       url: "/v1/messages",
       headers: { "user-agent": "curl/8.0" },
       payload: { model: "claude-sonnet-4-20250514", max_tokens: 1024, messages: [] },
     });
-    expect(res.statusCode).toBe(403);
+    expect(res.statusCode).toBe(400);
   });
 
-  it("rejects requests with no user-agent", async () => {
+  it("allows requests with no user-agent", async () => {
     const res = await app.inject({
       method: "POST",
       url: "/v1/messages",
       headers: {},
       payload: { model: "claude-sonnet-4-20250514", max_tokens: 1024, messages: [] },
     });
-    expect(res.statusCode).toBe(403);
+    expect(res.statusCode).toBe(400);
   });
 
-  it("skips UA check for /mcp/ routes", async () => {
+  it("still allows /mcp/ routes", async () => {
     const res = await app.inject({
       method: "POST",
       url: "/mcp/test-conv",
       headers: {},
       payload: { jsonrpc: "2.0", id: 1, method: "initialize" },
     });
-    // Should not be 403 since no UA is required for MCP routes
     expect(res.statusCode).not.toBe(403);
   });
 });
