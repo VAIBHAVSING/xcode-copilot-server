@@ -1,6 +1,15 @@
 # Publishing Guide
 
-This guide explains how to publish the `copilot-proxy` package to GitHub Packages.
+This guide explains how to publish the `copilot-proxy` package to GitHub Packages and npm registry.
+
+## Overview
+
+This repository is configured with two publishing workflows:
+
+1. **GitHub Packages (npm registry)** - Automatically publishes when a GitHub release is created
+2. **npm Registry (npmjs.com)** - Manual workflow dispatch for publishing to the public npm registry
+
+Both workflows run tests, linting, and build steps before publishing to ensure package quality.
 
 ## Prerequisites
 
@@ -73,14 +82,42 @@ To install packages from GitHub Packages, users need a Personal Access Token wit
 5. Click "Generate token"
 6. Copy the token and use it in your `~/.npmrc` file
 
-## Publishing to npm Registry (Optional)
+## Publishing to npm Registry
 
-If you want to also publish to the public npm registry:
+The package can also be published to the public npm registry (npmjs.com) using the separate workflow.
 
-1. Update `proxy-server/package.json` to remove or modify `publishConfig`
-2. Create a new workflow or modify the existing one to publish to npm
-3. Add `NPM_TOKEN` secret to the repository settings
-4. Update the workflow to use the npm registry
+### Setup
+
+1. **Create an npm account** at https://www.npmjs.com if you don't have one
+2. **Generate an npm access token**:
+   - Go to https://www.npmjs.com/settings/[username]/tokens
+   - Click "Generate New Token" → "Classic Token"
+   - Select "Automation" type
+   - Copy the token
+3. **Add the token to GitHub secrets**:
+   - Go to repository Settings → Secrets and variables → Actions
+   - Click "New repository secret"
+   - Name: `NPM_TOKEN`
+   - Value: Your npm token
+   - Click "Add secret"
+
+### Publishing
+
+1. Go to "Actions" → "Publish to npm Registry"
+2. Click "Run workflow"
+3. Enter the tag name (e.g., `v3.0.1`)
+4. Click "Run workflow"
+
+The workflow will run tests, build the package, and publish to npmjs.com.
+
+### Dual Publishing
+
+To publish to both GitHub Packages and npm registry:
+
+1. First publish to GitHub Packages (via release or workflow dispatch)
+2. Then manually run the "Publish to npm Registry" workflow
+
+Note: The `publishConfig` in `package.json` is set to GitHub Packages. If you want to publish to npm by default, you can remove or modify this configuration.
 
 ## Troubleshooting
 
