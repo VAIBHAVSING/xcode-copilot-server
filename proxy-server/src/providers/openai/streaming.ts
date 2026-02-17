@@ -4,7 +4,7 @@ import type { Logger } from "../../logger.js";
 import { formatCompaction, SSE_HEADERS } from "../shared/streaming-utils.js";
 import { currentTimestamp, type ChatCompletionMessage, type ChatCompletionChunk } from "./schemas.js";
 
-const REQUEST_TIMEOUT_MS = 5 * 60 * 1000;
+const REQUEST_TIMEOUT_MS = 1000;
 
 export async function handleStreaming(
   reply: FastifyReply,
